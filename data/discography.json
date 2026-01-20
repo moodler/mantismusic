@@ -1,0 +1,149 @@
+{
+  "artist": "Mantis Audiogram",
+  "albums": [
+    {
+      "id": "bouzoukidelic",
+      "title": "Bouzoukidelic",
+      "year": 2025,
+      "releaseDate": "2025",
+      "type": "album",
+      "tracks": [
+        {
+          "trackNumber": 1,
+          "title": "Bouzoukidelic"
+        },
+        {
+          "trackNumber": 2,
+          "title": "Goumenissa"
+        },
+        {
+          "trackNumber": 3,
+          "title": "Ocean within"
+        },
+        {
+          "trackNumber": 4,
+          "title": "Your face"
+        },
+        {
+          "trackNumber": 5,
+          "title": "Opa!"
+        },
+        {
+          "trackNumber": 6,
+          "title": "Yellow snake"
+        },
+        {
+          "trackNumber": 7,
+          "title": "Bouki"
+        },
+        {
+          "trackNumber": 8,
+          "title": "Bouzpooky"
+        }
+      ]
+    },
+    {
+      "id": "love-songs-1",
+      "title": "Love Songs 1",
+      "year": 2025,
+      "releaseDate": "2025",
+      "type": "album",
+      "tracks": [
+        {
+          "trackNumber": 1,
+          "title": "All the way - His version"
+        },
+        {
+          "trackNumber": 2,
+          "title": "All the way - Her version"
+        },
+        {
+          "trackNumber": 3,
+          "title": "Not gonna stop"
+        },
+        {
+          "trackNumber": 4,
+          "title": "I'm your man"
+        },
+        {
+          "trackNumber": 5,
+          "title": "Come with me"
+        },
+        {
+          "trackNumber": 6,
+          "title": "Then I saw your face"
+        },
+        {
+          "trackNumber": 7,
+          "title": "Saturday"
+        },
+        {
+          "trackNumber": 8,
+          "title": "Big brown eyes"
+        }
+      ]
+    }
+  ],
+  "singles": [
+    {
+      "id": "take-it-slow",
+      "title": "Take it Slow",
+      "year": 2026,
+      "releaseDate": "2026-01-21",
+      "type": "single"
+    },
+    {
+      "id": "users-are-the-used",
+      "title": "Users are the Used",
+      "year": 2026,
+      "releaseDate": "2026",
+      "type": "ep",
+      "tracks": [
+        {
+          "trackNumber": 1,
+          "title": "Users are the Used"
+        },
+        {
+          "trackNumber": 2,
+          "title": "10,000 machines"
+        }
+      ]
+    },
+    {
+      "id": "what-do-you-not-need",
+      "title": "What do you not need",
+      "year": 2026,
+      "releaseDate": "2026",
+      "type": "single"
+    },
+    {
+      "id": "whatcha-gonna-do",
+      "title": "Whatcha gonna do (feat. Suno)",
+      "year": 2026,
+      "releaseDate": "2026",
+      "type": "single",
+      "featuring": ["Suno"]
+    },
+    {
+      "id": "love-this-world",
+      "title": "Love this world",
+      "year": 2025,
+      "releaseDate": "2025",
+      "type": "single"
+    },
+    {
+      "id": "enough",
+      "title": "Enough",
+      "year": 2025,
+      "releaseDate": "2025",
+      "type": "single"
+    },
+    {
+      "id": "connective",
+      "title": "Connective",
+      "year": 2025,
+      "releaseDate": "2025",
+      "type": "single"
+    }
+  ]
+}
