@@ -1,0 +1,128 @@
+{
+  "artist": {
+    "name": "Mantis",
+    "bio": "Independent artist exploring sound and emotion",
+    "social": {
+      "youtube": "https://youtube.com/@mantis",
+      "spotify": "https://open.spotify.com/artist/mantis",
+      "instagram": "https://instagram.com/mantis"
+    },
+    "image": "/music/artist.jpg",
+    "headerImage": "/music/artist_header.jpg",
+    "theme": {
+      "primaryColor": "#6366f1",
+      "secondaryColor": "#8b5cf6"
+    }
+  },
+  "releases": [
+    {
+      "id": "midnight-echoes",
+      "title": "Midnight Echoes",
+      "type": "album",
+      "releaseDate": "2025-12-15",
+      "cover": "/music/releases/midnight-echoes/midnight-echoes.jpg",
+      "description": "A journey through nocturnal soundscapes",
+      "tracks": [
+        {
+          "id": "01",
+          "title": "Moonlit Path",
+          "index": 1,
+          "duration": 245,
+          "audioUrl": "/music/releases/midnight-echoes/tracks/01_moonlit_path/moonlit_path.mp3",
+          "cover": "/music/releases/midnight-echoes/tracks/01_moonlit_path/moonlit_path.jpg",
+          "lyrics": "Walking through the night...",
+          "tags": ["Ambient", "Chill", "Nocturnal"],
+          "youtubeUrl": "https://youtube.com/watch?v=example1",
+          "spotifyUrl": "https://open.spotify.com/track/example1",
+          "appleMusicUrl": "https://music.apple.com/track/example1",
+          "aiUsage": "AI-assisted composition and arrangement"
+        },
+        {
+          "id": "02",
+          "title": "Starlight Dreams",
+          "index": 2,
+          "duration": 198,
+          "audioUrl": "/music/releases/midnight-echoes/tracks/02_starlight_dreams/starlight_dreams.mp3",
+          "cover": "/music/releases/midnight-echoes/midnight-echoes.jpg",
+          "lyrics": "Dreaming under stars...",
+          "tags": ["Ambient", "Dream Pop", "AI"],
+          "youtubeUrl": "https://youtube.com/watch?v=example2",
+          "aiUsage": "AI-generated vocals and mixing"
+        }
+      ]
+    },
+    {
+      "id": "summer-vibes",
+      "title": "Summer Vibes",
+      "type": "single",
+      "releaseDate": "2025-08-20",
+      "cover": "/music/releases/summer-vibes/summer-vibes.jpg",
+      "description": "Feel the warmth",
+      "tracks": [
+        {
+          "id": "01",
+          "title": "Summer Vibes",
+          "index": 1,
+          "duration": 210,
+          "audioUrl": "/music/releases/summer-vibes/tracks/01_summer_vibes/summer_vibes.mp3",
+          "cover": "/music/releases/summer-vibes/summer-vibes.jpg",
+          "lyrics": "Sunshine on my face...",
+          "tags": ["Upbeat", "Pop", "Summer"],
+          "youtubeUrl": "https://youtube.com/watch?v=example3"
+        }
+      ]
+    },
+    {
+      "id": "deep-focus",
+      "title": "Deep Focus",
+      "type": "album",
+      "releaseDate": "2025-03-10",
+      "cover": "/music/releases/deep-focus/deep-focus.jpg",
+      "description": "Music for concentration and flow",
+      "tracks": [
+        {
+          "id": "01",
+          "title": "Flow State",
+          "index": 1,
+          "duration": 420,
+          "audioUrl": "/music/releases/deep-focus/tracks/01_flow_state/flow_state.mp3",
+          "cover": "/music/releases/deep-focus/deep-focus.jpg",
+          "lyrics": "",
+          "tags": ["Lo-fi", "Instrumental", "Study", "AI"],
+          "aiUsage": "Fully AI-generated track"
+        },
+        {
+          "id": "02",
+          "title": "Concentration",
+          "index": 2,
+          "duration": 380,
+          "audioUrl": "/music/releases/deep-focus/tracks/02_concentration/concentration.mp3",
+          "cover": "/music/releases/deep-focus/deep-focus.jpg",
+          "lyrics": "",
+          "tags": ["Lo-fi", "Instrumental", "Study"],
+          "aiUsage": ""
+        }
+      ]
+    },
+    {
+      "id": "neon-nights",
+      "title": "Neon Nights",
+      "type": "single",
+      "releaseDate": "2024-11-05",
+      "cover": "/music/releases/neon-nights/neon-nights.jpg",
+      "description": "Synthwave journey through the city",
+      "tracks": [
+        {
+          "id": "01",
+          "title": "Neon Nights",
+          "index": 1,
+          "duration": 255,
+          "audioUrl": "/music/releases/neon-nights/tracks/01_neon_nights/neon_nights.mp3",
+          "cover": "/music/releases/neon-nights/neon-nights.jpg",
+          "lyrics": "City lights are calling...",
+          "tags": ["Synthwave", "Electronic", "Upbeat"]
+        }
+      ]
+    }
+  ]
+}
