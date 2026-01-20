@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mantis Audiogram - Official Discography</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <h1 class="logo">Mantis Audiogram</h1>
+                <nav class="nav">
+                    <button class="nav-btn active" data-view="all">All</button>
+                    <button class="nav-btn" data-view="albums">Albums</button>
+                    <button class="nav-btn" data-view="singles">Singles</button>
+                    <button class="nav-btn" data-view="about">About</button>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+        <div class="container">
+            <!-- About Section -->
+            <section id="about-section" class="about-section hidden">
+                <div class="about-content">
+                    <h2>About the Artist</h2>
+                    <p id="artist-bio"></p>
+                    <div class="social-links" id="social-links"></div>
+                </div>
+            </section>
+
+            <!-- Search and Filter -->
+            <section id="controls-section" class="controls-section">
+                <div class="search-bar">
+                    <input type="text" id="search-input" placeholder="Search songs, albums, lyrics, tags..." />
+                </div>
+                <div class="filters">
+                    <select id="genre-filter">
+                        <option value="">All Genres</option>
+                    </select>
+                    <select id="mood-filter">
+                        <option value="">All Moods</option>
+                    </select>
+                    <select id="year-filter">
+                        <option value="">All Years</option>
+                    </select>
+                </div>
+            </section>
+
+            <!-- Albums Section -->
+            <section id="albums-section" class="releases-section">
+                <h2 class="section-title">Albums</h2>
+                <div id="albums-grid" class="releases-grid"></div>
+            </section>
+
+            <!-- Singles Section -->
+            <section id="singles-section" class="releases-section">
+                <h2 class="section-title">Singles & EPs</h2>
+                <div id="singles-grid" class="releases-grid"></div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Modal for Track Details -->
+    <div id="track-modal" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <button class="modal-close">&times;</button>
+            <div class="modal-body">
+                <div class="track-details">
+                    <div class="track-header">
+                        <div class="track-cover-container">
+                            <div class="track-cover" id="modal-cover"></div>
+                        </div>
+                        <div class="track-info">
+                            <h2 id="modal-title"></h2>
+                            <p class="track-album" id="modal-album"></p>
+                            <div class="track-meta" id="modal-meta"></div>
+                            <div class="track-tags" id="modal-tags"></div>
+                        </div>
+                    </div>
+                    <div class="track-lyrics">
+                        <h3>Lyrics</h3>
+                        <div id="modal-lyrics"></div>
+                    </div>
+                    <div class="track-credits">
+                        <h3>Credits</h3>
+                        <div id="modal-credits"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Release Details Modal -->
+    <div id="release-modal" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content large">
+            <button class="modal-close">&times;</button>
+            <div class="modal-body">
+                <div class="release-details">
+                    <div class="release-header">
+                        <div class="release-cover-container">
+                            <div class="release-cover" id="release-modal-cover"></div>
+                        </div>
+                        <div class="release-info">
+                            <h2 id="release-modal-title"></h2>
+                            <p class="release-year" id="release-modal-year"></p>
+                            <p class="release-description" id="release-modal-description"></p>
+                            <div class="release-meta" id="release-modal-meta"></div>
+                            <div class="release-tags" id="release-modal-tags"></div>
+                            <div class="release-streaming" id="release-modal-streaming"></div>
+                        </div>
+                    </div>
+                    <div class="release-tracklist">
+                        <h3>Tracklist</h3>
+                        <div id="release-modal-tracks"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
