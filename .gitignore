@@ -1,0 +1,18 @@
+# Music data and audio files
+music/
+audio/
+images/
+
+# Build output
+data/discography.json
+
+# Screenshots
+screenshot-*.jpg
+screenshot-*.png
+
+# Dependencies
+node_modules/
+package-lock.json
+
+# IDE / tools
+.claude/

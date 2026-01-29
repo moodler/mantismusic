@@ -55,79 +55,133 @@
                 </div>
             </section>
 
+            <!-- Combined Discography Section -->
+            <section id="discography-section" class="releases-section">
+                <div id="discography-grid" class="releases-grid"></div>
+            </section>
+
             <!-- Albums Section -->
-            <section id="albums-section" class="releases-section">
+            <section id="albums-section" class="releases-section hidden">
                 <h2 class="section-title">Albums</h2>
                 <div id="albums-grid" class="releases-grid"></div>
             </section>
 
             <!-- Singles Section -->
-            <section id="singles-section" class="releases-section">
+            <section id="singles-section" class="releases-section hidden">
                 <h2 class="section-title">Singles & EPs</h2>
                 <div id="singles-grid" class="releases-grid"></div>
+            </section>
+
+            <!-- Release Detail Page -->
+            <section id="release-detail-section" class="detail-section hidden">
+                <div id="release-detail-gradient" class="detail-gradient"></div>
+                <button id="back-btn" class="back-btn">← Back</button>
+                <div class="detail-header">
+                    <div id="detail-cover" class="detail-cover"></div>
+                    <div class="detail-info">
+                        <h1 id="detail-title"></h1>
+                        <p id="detail-year" class="detail-year"></p>
+                        <p id="detail-description" class="detail-description"></p>
+                        <div id="detail-meta" class="detail-meta"></div>
+                        <div id="detail-tags" class="detail-tags"></div>
+                        <div id="detail-streaming" class="detail-streaming"></div>
+                    </div>
+                </div>
+                <div class="detail-tracklist">
+                    <h2>Tracklist</h2>
+                    <div id="detail-tracks"></div>
+                </div>
+                <div id="detail-lyrics-section" class="detail-lyrics-section hidden">
+                    <h2>Lyrics</h2>
+                    <div id="detail-lyrics" class="detail-lyrics"></div>
+                </div>
+                <div id="detail-credits-section" class="detail-credits-section hidden">
+                    <h2>Credits</h2>
+                    <div id="detail-credits" class="detail-credits"></div>
+                </div>
+            </section>
+
+            <!-- Track Detail Page -->
+            <section id="track-detail-section" class="detail-section hidden">
+                <div id="track-detail-gradient" class="detail-gradient"></div>
+                <button id="track-back-btn" class="back-btn">← Back</button>
+                <div class="detail-header">
+                    <div id="track-detail-cover" class="detail-cover"></div>
+                    <div class="detail-info">
+                        <h1 id="track-detail-title"></h1>
+                        <p id="track-detail-year" class="detail-year"></p>
+                        <div id="track-detail-meta" class="detail-meta"></div>
+                        <div id="track-detail-tags" class="detail-tags"></div>
+                        <div id="track-detail-controls" class="detail-streaming"></div>
+                    </div>
+                </div>
+                <div id="track-appears-on-section" class="track-appears-on-section hidden">
+                    <h2>Appears on</h2>
+                    <div id="track-appears-on" class="track-appears-on"></div>
+                </div>
+                <div id="track-lyrics-section" class="detail-lyrics-section">
+                    <h2>Lyrics</h2>
+                    <div id="track-detail-lyrics"></div>
+                </div>
+                <div id="track-credits-section" class="detail-credits-section">
+                    <h2>Credits</h2>
+                    <div id="track-detail-credits"></div>
+                </div>
             </section>
         </div>
     </main>
 
-    <!-- Modal for Track Details -->
-    <div id="track-modal" class="modal hidden">
-        <div class="modal-overlay"></div>
-        <div class="modal-content">
-            <button class="modal-close">&times;</button>
-            <div class="modal-body">
-                <div class="track-details">
-                    <div class="track-header">
-                        <div class="track-cover-container">
-                            <div class="track-cover" id="modal-cover"></div>
-                        </div>
-                        <div class="track-info">
-                            <h2 id="modal-title"></h2>
-                            <p class="track-album" id="modal-album"></p>
-                            <div class="track-meta" id="modal-meta"></div>
-                            <div class="track-tags" id="modal-tags"></div>
-                        </div>
+    <!-- Audio Player Bar -->
+    <div id="player-bar" class="player-bar">
+        <audio id="audio-element"></audio>
+        <div class="player-content">
+            <div class="player-track-info">
+                <div id="player-cover" class="player-cover"></div>
+                <div class="player-text">
+                    <div id="player-title" class="player-title"></div>
+                    <div id="player-artist" class="player-artist"></div>
+                </div>
+            </div>
+            <div class="player-controls">
+                <button id="prev-btn" class="player-btn">⏮</button>
+                <button id="play-pause-btn" class="player-btn play-btn">▶</button>
+                <button id="next-btn" class="player-btn">⏭</button>
+            </div>
+            <div class="player-progress">
+                <span id="current-time" class="time">0:00</span>
+                <div id="progress-bar" class="progress-bar">
+                    <div id="progress-fill" class="progress-fill"></div>
+                </div>
+                <span id="total-time" class="time">0:00</span>
+            </div>
+            <div class="player-volume">
+                <span class="volume-icon">🔊</span>
+                <input type="range" id="volume-slider" class="volume-slider" min="0" max="100" value="80">
+            </div>
+            <div class="player-mode">
+                <button id="mode-btn" class="mode-btn" title="Repeat: Off">🔁</button>
+            </div>
+            <div class="player-queue">
+                <button id="queue-btn" class="queue-btn" title="View queue">
+                    <span class="queue-icon">☰</span>
+                    <span id="queue-badge" class="queue-badge hidden">0</span>
+                </button>
+                <!-- Queue Popup -->
+                <div id="queue-popup" class="queue-popup hidden">
+                    <div class="queue-header">
+                        <h3>Up Next</h3>
+                        <button id="clear-queue-btn" class="clear-queue-btn">Clear</button>
                     </div>
-                    <div class="track-lyrics">
-                        <h3>Lyrics</h3>
-                        <div id="modal-lyrics"></div>
-                    </div>
-                    <div class="track-credits">
-                        <h3>Credits</h3>
-                        <div id="modal-credits"></div>
+                    <div id="queue-list" class="queue-list">
+                        <p class="queue-empty">Queue is empty</p>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Release Details Modal -->
-    <div id="release-modal" class="modal hidden">
-        <div class="modal-overlay"></div>
-        <div class="modal-content large">
-            <button class="modal-close">&times;</button>
-            <div class="modal-body">
-                <div class="release-details">
-                    <div class="release-header">
-                        <div class="release-cover-container">
-                            <div class="release-cover" id="release-modal-cover"></div>
-                        </div>
-                        <div class="release-info">
-                            <h2 id="release-modal-title"></h2>
-                            <p class="release-year" id="release-modal-year"></p>
-                            <p class="release-description" id="release-modal-description"></p>
-                            <div class="release-meta" id="release-modal-meta"></div>
-                            <div class="release-tags" id="release-modal-tags"></div>
-                            <div class="release-streaming" id="release-modal-streaming"></div>
-                        </div>
-                    </div>
-                    <div class="release-tracklist">
-                        <h3>Tracklist</h3>
-                        <div id="release-modal-tracks"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    <!-- Queue Notification -->
+    <div id="queue-notification" class="queue-notification hidden"></div>
 
     <script src="js/app.js"></script>
 </body>
