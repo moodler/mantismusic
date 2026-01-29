@@ -16,7 +16,7 @@ Structure:
   │   │   └── song_name.jpg (cover - for singles)
   └── collections/      # Albums and EPs only (reference tracks)
       ├── album_name/
-      │   ├── release.md  # includes tracks: [song1, song2, ...]
+      │   ├── collection.md  # includes tracks: [song1, song2, ...]
       │   └── album_name.jpg
 
   Singles are tracks not referenced by any collection.
@@ -230,12 +230,10 @@ def load_all_tracks():
             'slug': track_slug,
             'title': frontmatter.get('title', track_slug.replace('_', ' ').title()),
             'duration': str(frontmatter.get('duration', '')),
-            'isrc': frontmatter.get('isrc', ''),
             'bpm': bpm,
             'key': frontmatter.get('key', ''),
             'mood': frontmatter.get('mood', []),
             'tags': frontmatter.get('tags', []),
-            'genres': frontmatter.get('genres', []),
             'description': description,
             'lyrics': lyrics if lyrics else frontmatter.get('lyrics', ''),
             'credits': frontmatter.get('credits', {}),
@@ -244,12 +242,7 @@ def load_all_tracks():
             'coverArt': track_cover_path,
             # Single-specific fields (used when track is a standalone single)
             'releaseDate': frontmatter.get('release_date', ''),
-            'year': frontmatter.get('year', ''),
-            'label': frontmatter.get('label', 'Independent'),
-            'producer': frontmatter.get('producer', ''),
-            'catalogNumber': frontmatter.get('catalog_number', ''),
-            'backgroundColor': frontmatter.get('background_color', '#1a1a1a'),
-            'textColor': frontmatter.get('text_color', '#ffffff'),
+            'year': str(frontmatter.get('release_date', ''))[:4] if frontmatter.get('release_date') else '',
             'streamingLinks': {
                 'spotify': frontmatter.get('spotify', ''),
                 'appleMusic': frontmatter.get('apple_music', ''),
@@ -268,9 +261,9 @@ def validate_release(release_dir, all_tracks):
     """Validate a release. Returns list of warnings."""
     warnings = []
 
-    release_md = release_dir / 'release.md'
+    release_md = release_dir / 'collection.md'
     if not release_md.exists():
-        warnings.append(f"FIXME: Missing release.md in {release_dir.name}")
+        warnings.append(f"FIXME: Missing collection.md in {release_dir.name}")
         return warnings
 
     frontmatter, _ = read_md_file(release_md)
@@ -306,7 +299,7 @@ def validate_release(release_dir, all_tracks):
 
 def parse_release(release_dir, all_tracks):
     """Parse a release directory and return release data."""
-    release_md = release_dir / 'release.md'
+    release_md = release_dir / 'collection.md'
     frontmatter, description = read_md_file(release_md)
 
     release_id = get_release_id(release_dir.name)
@@ -323,32 +316,21 @@ def parse_release(release_dir, all_tracks):
             json_key = 'appleMusic' if platform == 'apple_music' else platform.replace('_', '')
             streaming_links[json_key] = frontmatter[platform]
 
-    # Handle None values
-    year = frontmatter.get('year', '')
-    if year is None:
-        year = ''
+    # Derive year from release_date
+    release_date = frontmatter.get('release_date', '')
+    year = str(release_date)[:4] if release_date else ''
 
     # Build base release data
     release_data = {
         'id': release_id,
         'title': frontmatter.get('title', release_dir.name),
         'year': year,
-        'releaseDate': frontmatter.get('release_date', ''),
+        'releaseDate': release_date,
         'type': release_type,
         'description': description,
         'coverArt': cover_path,
         'coverArtHigh': (cover_path.rsplit('.', 1)[0] + '-hires.' + cover_path.rsplit('.', 1)[1]) if cover_path else '',
-        'backgroundColor': frontmatter.get('background_color', '#1a1a1a'),
-        'textColor': frontmatter.get('text_color', '#ffffff'),
         'tags': frontmatter.get('tags', []),
-        'genres': frontmatter.get('genres', []),
-        'label': frontmatter.get('label', 'Independent'),
-        'producer': frontmatter.get('producer', ''),
-        'mixedBy': frontmatter.get('mixed_by', ''),
-        'masteredBy': frontmatter.get('mastered_by', ''),
-        'recordedAt': frontmatter.get('recorded_at', ''),
-        'catalogNumber': frontmatter.get('catalog_number', ''),
-        'formats': frontmatter.get('formats', ['Digital']),
         'streamingLinks': streaming_links,
     }
 
@@ -361,10 +343,8 @@ def parse_release(release_dir, all_tracks):
         if track_ref in all_tracks:
             track_data = all_tracks[track_ref].copy()
             track_data['trackNumber'] = idx
-            # Remove single-specific fields from track when part of album
-            for field in ['slug', 'releaseDate', 'year', 'label', 'producer',
-                         'catalogNumber', 'backgroundColor', 'textColor',
-                         'streamingLinks', 'genres']:
+            # Remove single-specific fields from track when part of collection
+            for field in ['slug', 'releaseDate', 'year', 'streamingLinks']:
                 track_data.pop(field, None)
             # Use track's own cover if available, otherwise release cover
             if not track_data.get('coverArt'):
@@ -416,8 +396,8 @@ def main():
                               if d.is_dir() and not d.name.startswith('.')])
 
         for release_dir in release_dirs:
-            # Skip if no release.md
-            if not (release_dir / 'release.md').exists():
+            # Skip if no collection.md
+            if not (release_dir / 'collection.md').exists():
                 continue
 
             print(f"  Processing collection: {release_dir.name}")
@@ -434,7 +414,7 @@ def main():
             release_data, release_type = parse_release(release_dir, all_tracks)
 
             # Track which tracks are used
-            frontmatter, _ = read_md_file(release_dir / 'release.md')
+            frontmatter, _ = read_md_file(release_dir / 'collection.md')
             for track_ref in frontmatter.get('tracks', []):
                 used_tracks.add(track_ref)
 
@@ -457,17 +437,9 @@ def main():
                 'description': track_data['description'],
                 'coverArt': track_data.get('coverArt', ''),
                 'coverArtHigh': (track_data['coverArt'].rsplit('.', 1)[0] + '-hires.' + track_data['coverArt'].rsplit('.', 1)[1]) if track_data.get('coverArt') else '',
-                'backgroundColor': track_data.get('backgroundColor', '#1a1a1a'),
-                'textColor': track_data.get('textColor', '#ffffff'),
                 'tags': track_data.get('tags', []),
-                'genres': track_data.get('genres', []),
-                'label': track_data.get('label', 'Independent'),
-                'producer': track_data.get('producer', ''),
-                'catalogNumber': track_data.get('catalogNumber', ''),
-                'formats': ['Digital'],
                 'streamingLinks': {k: v for k, v in track_data.get('streamingLinks', {}).items() if v},
                 'duration': track_data['duration'],
-                'isrc': track_data['isrc'],
                 'bpm': track_data['bpm'],
                 'key': track_data['key'],
                 'mood': track_data['mood'],

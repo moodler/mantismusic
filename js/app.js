@@ -8,7 +8,8 @@ let discographyData = null;
 let filteredAlbums = [];
 let filteredSingles = [];
 let filteredReleases = [];
-let currentView = 'all';
+let allTracks = [];       // Flattened list of { track, release } for the Tracks view
+let currentView = 'tracks';
 
 // Audio player state
 let audioPlayer = null;
@@ -22,6 +23,24 @@ let queue = [];  // Array of { track, release } objects
 // Playback mode: 'normal', 'repeat-one', 'repeat-all'
 let playbackMode = 'normal';
 
+// Track detail play button state
+let trackDetailPlayBtn = null;
+let trackDetailTrack = null;
+
+function syncTrackDetailPlayBtn() {
+    if (!trackDetailPlayBtn || !trackDetailTrack) return;
+    const isCurrentlyPlaying = currentTrack === trackDetailTrack && isPlaying;
+    if (isCurrentlyPlaying) {
+        trackDetailPlayBtn.innerHTML = '&#9654; Playing now';
+        trackDetailPlayBtn.disabled = true;
+        trackDetailPlayBtn.classList.add('playing-now');
+    } else {
+        trackDetailPlayBtn.innerHTML = '&#9654; Play';
+        trackDetailPlayBtn.disabled = false;
+        trackDetailPlayBtn.classList.remove('playing-now');
+    }
+}
+
 // Resolve a data path to full URL
 function resolveDataUrl(path) {
     if (!path) return null;
@@ -33,13 +52,122 @@ function resolveDataUrl(path) {
     return cleanPath;
 }
 
+// Hash routing guard — prevents navigateFromHash from firing
+// when we programmatically set the hash
+let hashChangeFromCode = false;
+
+// Update the URL hash without triggering navigateFromHash
+function updateHash(hash) {
+    hashChangeFromCode = true;
+    window.location.hash = hash;
+    // Reset the guard after the synchronous hashchange fires
+    hashChangeFromCode = false;
+}
+
+// Look up a release (album or single) by its id
+function findReleaseById(id) {
+    if (!discographyData) return null;
+    return discographyData.albums.find(a => a.id === id)
+        || discographyData.singles.find(s => s.id === id)
+        || null;
+}
+
+// Read the current hash and navigate to the matching view
+function navigateFromHash() {
+    const hash = window.location.hash.replace(/^#\/?/, ''); // strip leading #/ or #
+
+    if (!hash) {
+        currentView = 'tracks';
+        navigationHistory = [];
+        syncNavButton();
+        renderView();
+        return;
+    }
+
+    const parts = hash.split('/');
+
+    if (parts[0] === 'collections') {
+        currentView = 'collections';
+        navigationHistory = [];
+        syncNavButton();
+        renderView();
+    } else if (parts[0] === 'tracks') {
+        currentView = 'tracks';
+        navigationHistory = [];
+        syncNavButton();
+        renderView();
+    } else if (parts[0] === 'about') {
+        currentView = 'about';
+        navigationHistory = [];
+        syncNavButton();
+        renderView();
+    } else if (parts[0] === 'release' && parts[1]) {
+        const release = findReleaseById(parts[1]);
+        if (release) {
+            navigationHistory = [{ type: 'list' }];
+            syncNavButton();
+            showReleaseDetail(release);
+        } else {
+            renderView();
+        }
+    } else if (parts[0] === 'track' && parts[1]) {
+        const release = findReleaseById(parts[1]);
+        if (release) {
+            if (parts[2]) {
+                // Track within a collection — index is 1-based
+                const trackIndex = parseInt(parts[2], 10) - 1;
+                const track = release.tracks?.[trackIndex];
+                if (track) {
+                    navigationHistory = [{ type: 'list' }, { type: 'release', release }];
+                    syncNavButton();
+                    showTrackDetail(track, release);
+                } else {
+                    renderView();
+                }
+            } else {
+                // Single track (no track number)
+                navigationHistory = [{ type: 'list' }];
+                syncNavButton();
+                showTrackDetail(release, release);
+            }
+        } else {
+            renderView();
+        }
+    } else {
+        currentView = 'tracks';
+        navigationHistory = [];
+        syncNavButton();
+        renderView();
+    }
+}
+
+// Sync the active nav button to match currentView
+function syncNavButton() {
+    document.querySelectorAll('.nav-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.view === currentView);
+    });
+}
+
 // Initialize app
 document.addEventListener('DOMContentLoaded', async () => {
     await loadDiscography();
     initializeEventListeners();
     initializeAudioPlayer();
     populateFilters();
-    renderView();
+
+    // Route from the URL hash, or fall back to default view
+    window.addEventListener('hashchange', () => {
+        if (!hashChangeFromCode) {
+            navigateFromHash();
+        }
+    });
+
+    if (window.location.hash && window.location.hash !== '#' && window.location.hash !== '#/') {
+        navigateFromHash();
+    } else {
+        renderView();
+    }
+
     loadMostRecentTrack();
 });
 
@@ -153,12 +281,15 @@ function togglePlayPause() {
         isPlaying = true;
     }
     updatePlayPauseButton();
+    syncTrackDetailPlayBtn();
 }
 
 // Update play/pause button
 function updatePlayPauseButton() {
     const btn = document.getElementById('play-pause-btn');
-    btn.textContent = isPlaying ? '⏸' : '▶';
+    btn.innerHTML = isPlaying
+        ? '<svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>'
+        : '<svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>';
 }
 
 // Update progress bar
@@ -206,6 +337,14 @@ function handleTrackEnd() {
             updateQueueBadge();
         }
         playNextFromQueue();
+    } else if (playbackMode === 'shuffle') {
+        if (queue.length > 0) {
+            const idx = Math.floor(Math.random() * queue.length);
+            const next = queue.splice(idx, 1)[0];
+            updateQueueBadge();
+            playTrack(next.track, next.release);
+            renderQueueList();
+        }
     } else {
         // Normal mode - just play next
         playNextFromQueue();
@@ -218,28 +357,47 @@ function cyclePlaybackMode() {
         playbackMode = 'repeat-one';
     } else if (playbackMode === 'repeat-one') {
         playbackMode = 'repeat-all';
+    } else if (playbackMode === 'repeat-all') {
+        playbackMode = 'shuffle';
+        shuffleQueue();
     } else {
         playbackMode = 'normal';
     }
     updatePlaybackModeButton();
 }
 
+function shuffleQueue() {
+    for (let i = queue.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [queue[i], queue[j]] = [queue[j], queue[i]];
+    }
+    renderQueueList();
+}
+
 // Update playback mode button appearance
 function updatePlaybackModeButton() {
     const btn = document.getElementById('mode-btn');
-    btn.classList.remove('active', 'repeat-one');
+    btn.classList.remove('active');
+
+    const svgRepeat = '<svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>';
+    const svgRepeatOne = '<svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/><text x="12" y="15" text-anchor="middle" font-size="8" font-weight="bold" fill="white">1</text></svg>';
+    const svgShuffle = '<svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>';
 
     if (playbackMode === 'normal') {
-        btn.innerHTML = '🔁';
+        btn.innerHTML = svgRepeat;
         btn.title = 'Repeat: Off';
     } else if (playbackMode === 'repeat-one') {
-        btn.innerHTML = '🔂';
-        btn.classList.add('active', 'repeat-one');
+        btn.innerHTML = svgRepeatOne;
+        btn.classList.add('active');
         btn.title = 'Repeat: One';
-    } else {
-        btn.innerHTML = '🔁';
+    } else if (playbackMode === 'repeat-all') {
+        btn.innerHTML = svgRepeat;
         btn.classList.add('active');
         btn.title = 'Repeat: All';
+    } else if (playbackMode === 'shuffle') {
+        btn.innerHTML = svgShuffle;
+        btn.classList.add('active');
+        btn.title = 'Shuffle';
     }
 }
 
@@ -411,6 +569,16 @@ function handleAudioError(e) {
 
 // Play next track
 function playNext() {
+    // Shuffle mode: pick random from queue
+    if (playbackMode === 'shuffle' && queue.length > 0) {
+        const idx = Math.floor(Math.random() * queue.length);
+        const next = queue.splice(idx, 1)[0];
+        updateQueueBadge();
+        playTrack(next.track, next.release);
+        renderQueueList();
+        return;
+    }
+
     // First check if there's something in the queue
     if (queue.length > 0) {
         playNextFromQueue();
@@ -423,7 +591,7 @@ function playNext() {
     const tracks = currentRelease.tracks;
     if (!tracks) return;
 
-    const currentIndex = tracks.findIndex(t => t.trackNumber === currentTrack.trackNumber);
+    const currentIndex = tracks.indexOf(currentTrack);
     if (currentIndex < tracks.length - 1) {
         playTrack(tracks[currentIndex + 1], currentRelease);
     }
@@ -442,7 +610,7 @@ function playPrevious() {
     const tracks = currentRelease.tracks;
     if (!tracks) return;
 
-    const currentIndex = tracks.findIndex(t => t.trackNumber === currentTrack.trackNumber);
+    const currentIndex = tracks.indexOf(currentTrack);
     if (currentIndex > 0) {
         playTrack(tracks[currentIndex - 1], currentRelease);
     }
@@ -469,6 +637,7 @@ function updatePlayerUI() {
 
     playerTitle.textContent = currentTrack.title;
     updatePlayPauseButton();
+    syncTrackDetailPlayBtn();
 
     const isSingle = !currentRelease.tracks;
 
@@ -589,6 +758,36 @@ function updateFilteredReleases() {
     filteredReleases = [...filteredAlbums, ...filteredSingles].sort((a, b) => {
         return new Date(b.releaseDate) - new Date(a.releaseDate);
     });
+
+    // Build flattened track list from all releases (not just filtered ones,
+    // so track-level tags work even when the parent release doesn't match)
+    const activeTag = document.getElementById('tag-filter')?.value || '';
+    const activeYear = document.getElementById('year-filter')?.value || '';
+    const allReleases = discographyData
+        ? [...discographyData.albums, ...discographyData.singles].filter(r => {
+            if (activeYear && r.year != activeYear) return false;
+            return true;
+          })
+        : [];
+
+    allTracks = [];
+    allReleases.forEach(release => {
+        if (release.tracks) {
+            release.tracks.forEach(track => {
+                // Match tag on track or parent release
+                if (activeTag && !track.tags?.includes(activeTag) && !release.tags?.includes(activeTag)) return;
+                allTracks.push({ track, release });
+            });
+        } else {
+            // Single — the release itself is the track
+            if (activeTag && !release.tags?.includes(activeTag)) return;
+            allTracks.push({ track: release, release });
+        }
+    });
+    // Sort by release date (newest first), preserving track order within a release
+    allTracks.sort((a, b) => {
+        return new Date(b.release.releaseDate) - new Date(a.release.releaseDate);
+    });
 }
 
 // Navigation history for back button
@@ -612,8 +811,7 @@ function initializeEventListeners() {
     document.getElementById('search-input').addEventListener('input', handleSearch);
 
     // Filter selects
-    document.getElementById('genre-filter').addEventListener('change', handleFilters);
-    document.getElementById('mood-filter').addEventListener('change', handleFilters);
+    document.getElementById('tag-filter').addEventListener('change', handleFilters);
     document.getElementById('year-filter').addEventListener('change', handleFilters);
 
     // Back buttons
@@ -623,40 +821,23 @@ function initializeEventListeners() {
 
 // Populate filter dropdowns
 function populateFilters() {
-    const genres = new Set();
-    const moods = new Set();
+    const tags = new Set();
     const years = new Set();
 
-    // Collect all unique values
+    // Collect all unique tags from releases and their tracks
     [...discographyData.albums, ...discographyData.singles].forEach(release => {
-        release.genres?.forEach(g => genres.add(g));
+        release.tags?.forEach(t => tags.add(t));
+        release.tracks?.forEach(track => track.tags?.forEach(t => tags.add(t)));
         years.add(release.year);
-
-        if (release.tracks) {
-            release.tracks.forEach(track => {
-                track.mood?.forEach(m => moods.add(m));
-            });
-        } else {
-            release.mood?.forEach(m => moods.add(m));
-        }
     });
 
-    // Populate genre filter
-    const genreFilter = document.getElementById('genre-filter');
-    Array.from(genres).sort().forEach(genre => {
+    // Populate tag filter
+    const tagFilter = document.getElementById('tag-filter');
+    Array.from(tags).sort().forEach(tag => {
         const option = document.createElement('option');
-        option.value = genre;
-        option.textContent = genre;
-        genreFilter.appendChild(option);
-    });
-
-    // Populate mood filter
-    const moodFilter = document.getElementById('mood-filter');
-    Array.from(moods).sort().forEach(mood => {
-        const option = document.createElement('option');
-        option.value = mood;
-        option.textContent = mood.charAt(0).toUpperCase() + mood.slice(1);
-        moodFilter.appendChild(option);
+        option.value = tag;
+        option.textContent = tag;
+        tagFilter.appendChild(option);
     });
 
     // Populate year filter
@@ -717,15 +898,14 @@ function searchMatches(release, query) {
 
 // Handle filters
 function handleFilters() {
-    const genre = document.getElementById('genre-filter').value;
-    const mood = document.getElementById('mood-filter').value;
+    const tag = document.getElementById('tag-filter').value;
     const year = document.getElementById('year-filter').value;
 
     filteredAlbums = discographyData.albums.filter(album =>
-        filterMatches(album, genre, mood, year)
+        filterMatches(album, tag, year)
     );
     filteredSingles = discographyData.singles.filter(single =>
-        filterMatches(single, genre, mood, year)
+        filterMatches(single, tag, year)
     );
 
     updateFilteredReleases();
@@ -733,22 +913,27 @@ function handleFilters() {
 }
 
 // Check if release matches filters
-function filterMatches(release, genre, mood, year) {
-    if (genre && !release.genres?.includes(genre)) return false;
+function filterMatches(release, tag, year) {
+    if (tag && !release.tags?.includes(tag)) return false;
     if (year && release.year != year) return false;
-
-    if (mood) {
-        if (release.tracks) {
-            const hasMood = release.tracks.some(track =>
-                track.mood?.includes(mood)
-            );
-            if (!hasMood) return false;
-        } else {
-            if (!release.mood?.includes(mood)) return false;
-        }
-    }
-
     return true;
+}
+
+// Create a clickable tag element that navigates to Tracks view filtered by that tag
+function createTagLink(tagText) {
+    const tagEl = document.createElement('span');
+    tagEl.className = 'tag tag-link';
+    tagEl.textContent = tagText;
+    tagEl.onclick = (e) => {
+        e.stopPropagation();
+        // Set the tag filter dropdown and navigate to tracks view
+        document.getElementById('tag-filter').value = tagText;
+        currentView = 'tracks';
+        navigationHistory = [];
+        syncNavButton();
+        handleFilters();
+    };
+    return tagEl;
 }
 
 // Hide all content sections
@@ -756,8 +941,8 @@ function hideAllSections() {
     document.getElementById('about-section').classList.add('hidden');
     document.getElementById('controls-section').classList.add('hidden');
     document.getElementById('discography-section').classList.add('hidden');
-    document.getElementById('albums-section').classList.add('hidden');
-    document.getElementById('singles-section').classList.add('hidden');
+    document.getElementById('collections-section').classList.add('hidden');
+    document.getElementById('tracks-section').classList.add('hidden');
     document.getElementById('release-detail-section').classList.add('hidden');
     document.getElementById('track-detail-section').classList.add('hidden');
 }
@@ -766,25 +951,24 @@ function hideAllSections() {
 function renderView() {
     hideAllSections();
 
+    // Update hash to reflect the current list view
+    const viewHashMap = { tracks: '#/', collections: '#/collections', about: '#/about' };
+    updateHash(viewHashMap[currentView] || '#/');
+
     switch(currentView) {
         case 'about':
             renderAbout();
             break;
-        case 'albums':
+        case 'collections':
             document.getElementById('controls-section').classList.remove('hidden');
-            document.getElementById('albums-section').classList.remove('hidden');
-            renderAlbums();
+            document.getElementById('collections-section').classList.remove('hidden');
+            renderCollections();
             break;
-        case 'singles':
-            document.getElementById('controls-section').classList.remove('hidden');
-            document.getElementById('singles-section').classList.remove('hidden');
-            renderSingles();
-            break;
-        case 'all':
+        case 'tracks':
         default:
             document.getElementById('controls-section').classList.remove('hidden');
-            document.getElementById('discography-section').classList.remove('hidden');
-            renderDiscography();
+            document.getElementById('tracks-section').classList.remove('hidden');
+            renderTracks();
             break;
     }
 }
@@ -833,26 +1017,47 @@ function renderAbout() {
     });
 }
 
-// Render albums
-function renderAlbums() {
-    const grid = document.getElementById('albums-grid');
+// Render collections (albums and EPs — any release with a tracks array)
+function renderCollections() {
+    const grid = document.getElementById('collections-grid');
     grid.innerHTML = '';
 
-    filteredAlbums.forEach(album => {
-        const card = createReleaseCard(album);
+    filteredReleases
+        .filter(r => r.tracks)
+        .forEach(release => {
+            const card = createReleaseCard(release);
+            grid.appendChild(card);
+        });
+}
+
+// Render all tracks (flattened from every release, sorted by release date)
+function renderTracks() {
+    const grid = document.getElementById('tracks-grid');
+    grid.innerHTML = '';
+
+    // Play All button
+    if (allTracks.length > 0) {
+        const playAllBtn = document.createElement('button');
+        playAllBtn.className = 'play-all-btn';
+        playAllBtn.innerHTML = '&#9654;&ensp;Play all';
+        playAllBtn.onclick = () => playAllVisible();
+        grid.appendChild(playAllBtn);
+    }
+
+    allTracks.forEach(({ track, release }) => {
+        const card = createTrackCard(track, release);
         grid.appendChild(card);
     });
 }
 
-// Render singles
-function renderSingles() {
-    const grid = document.getElementById('singles-grid');
-    grid.innerHTML = '';
-
-    filteredSingles.forEach(single => {
-        const card = createReleaseCard(single);
-        grid.appendChild(card);
-    });
+function playAllVisible() {
+    if (allTracks.length === 0) return;
+    const first = allTracks[0];
+    queue = allTracks.slice(1).map(({ track, release }) => ({ track, release }));
+    updateQueueBadge();
+    renderQueueList();
+    playTrack(first.track, first.release);
+    showQueueNotification(`Playing ${allTracks.length} tracks`);
 }
 
 // Create release card
@@ -878,7 +1083,26 @@ function createReleaseCard(release) {
         cover.textContent = release.title.substring(0, 2).toUpperCase();
     }
 
-    // Add queue button overlay on cover
+    // Add play + queue button overlay on cover
+    const btnGroup = document.createElement('div');
+    btnGroup.className = 'card-btn-group';
+
+    const playBtn = document.createElement('button');
+    playBtn.className = 'card-play-btn';
+    playBtn.innerHTML = '&#9654;';
+    playBtn.title = 'Play';
+    playBtn.onclick = (e) => {
+        e.stopPropagation();
+        if (release.tracks) {
+            queue = release.tracks.slice(1).map(t => ({ track: t, release }));
+            updateQueueBadge();
+            renderQueueList();
+            playTrack(release.tracks[0], release);
+        } else {
+            playTrack(release, release);
+        }
+    };
+
     const queueBtn = document.createElement('button');
     queueBtn.className = 'card-queue-btn';
     queueBtn.innerHTML = '+';
@@ -888,8 +1112,10 @@ function createReleaseCard(release) {
         addReleaseToQueue(release);
     };
 
+    btnGroup.appendChild(playBtn);
+    btnGroup.appendChild(queueBtn);
     coverContainer.appendChild(cover);
-    coverContainer.appendChild(queueBtn);
+    coverContainer.appendChild(btnGroup);
 
     const info = document.createElement('div');
     info.className = 'release-info';
@@ -914,10 +1140,7 @@ function createReleaseCard(release) {
     const tags = document.createElement('div');
     tags.className = 'release-tags';
     release.tags?.slice(0, 3).forEach(tag => {
-        const tagEl = document.createElement('span');
-        tagEl.className = 'tag';
-        tagEl.textContent = tag;
-        tags.appendChild(tagEl);
+        tags.appendChild(createTagLink(tag));
     });
 
     info.appendChild(title);
@@ -931,10 +1154,96 @@ function createReleaseCard(release) {
     return card;
 }
 
+// Create a card for an individual track (used in the Tracks view)
+function createTrackCard(track, release) {
+    const card = document.createElement('div');
+    card.className = 'release-card';
+    card.onclick = () => {
+        navigationHistory.push({ type: 'list' });
+        showTrackDetail(track, release);
+    };
+
+    const coverContainer = document.createElement('div');
+    coverContainer.className = 'release-cover-container';
+
+    const cover = document.createElement('div');
+    cover.className = 'release-cover';
+
+    const coverArt = track.coverArt || release.coverArt;
+    if (coverArt) {
+        cover.style.backgroundImage = `url(${resolveDataUrl(coverArt)})`;
+        cover.style.backgroundSize = 'cover';
+        cover.style.backgroundPosition = 'center';
+    } else {
+        cover.style.background = release.backgroundColor || 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+        cover.style.color = release.textColor || '#ffffff';
+        cover.textContent = (track.title || release.title).substring(0, 2).toUpperCase();
+    }
+
+    const btnGroup = document.createElement('div');
+    btnGroup.className = 'card-btn-group';
+
+    const playBtn = document.createElement('button');
+    playBtn.className = 'card-play-btn';
+    playBtn.innerHTML = '&#9654;';
+    playBtn.title = 'Play';
+    playBtn.onclick = (e) => {
+        e.stopPropagation();
+        playTrack(track, release);
+    };
+
+    const queueBtn = document.createElement('button');
+    queueBtn.className = 'card-queue-btn';
+    queueBtn.innerHTML = '+';
+    queueBtn.title = 'Add to queue';
+    queueBtn.onclick = (e) => {
+        e.stopPropagation();
+        addToQueue(track, release);
+    };
+
+    btnGroup.appendChild(playBtn);
+    btnGroup.appendChild(queueBtn);
+    coverContainer.appendChild(cover);
+    coverContainer.appendChild(btnGroup);
+
+    const info = document.createElement('div');
+    info.className = 'release-info';
+
+    const title = document.createElement('h3');
+    title.className = 'release-title';
+    title.textContent = track.title || release.title;
+
+    const meta = document.createElement('div');
+    meta.className = 'release-meta';
+    const isSingle = !release.tracks;
+    const parts = [];
+    if (!isSingle) parts.push(release.title);
+    parts.push(release.year);
+    if (track.duration || release.duration) parts.push(track.duration || release.duration);
+    meta.textContent = parts.join(' \u2022 ');
+
+    const tags = document.createElement('div');
+    tags.className = 'release-tags';
+    const allTags = [...(track.mood || []), ...(track.tags || [])];
+    allTags.slice(0, 3).forEach(tag => {
+        tags.appendChild(createTagLink(tag));
+    });
+
+    info.appendChild(title);
+    info.appendChild(meta);
+    info.appendChild(tags);
+
+    card.appendChild(coverContainer);
+    card.appendChild(info);
+
+    return card;
+}
+
 // Show release detail page
 function showReleaseDetail(release) {
     hideAllSections();
     currentDetailRelease = release;
+    updateHash(`#/release/${release.id}`);
 
     // Set cover
     const cover = document.getElementById('detail-cover');
@@ -983,10 +1292,7 @@ function showReleaseDetail(release) {
     const tagsContainer = document.getElementById('detail-tags');
     tagsContainer.innerHTML = '';
     release.tags?.forEach(tag => {
-        const tagEl = document.createElement('span');
-        tagEl.className = 'tag';
-        tagEl.textContent = tag;
-        tagsContainer.appendChild(tagEl);
+        tagsContainer.appendChild(createTagLink(tag));
     });
 
     // Set streaming links
@@ -1035,13 +1341,6 @@ function showReleaseDetail(release) {
 
         singleControls.appendChild(duration);
         streamingContainer.appendChild(singleControls);
-    } else {
-        // Add queue all button for albums/EPs only
-        const queueAllBtn = document.createElement('button');
-        queueAllBtn.className = 'queue-all-btn';
-        queueAllBtn.innerHTML = '+ Add All to Queue';
-        queueAllBtn.onclick = () => addReleaseToQueue(release);
-        streamingContainer.appendChild(queueAllBtn);
     }
 
     if (release.streamingLinks && Object.keys(release.streamingLinks).length > 0) {
@@ -1073,13 +1372,15 @@ function showReleaseDetail(release) {
         tracklistSection.classList.add('hidden');
     } else {
         tracklistSection.classList.remove('hidden');
+        const queueAllBtn = document.getElementById('tracklist-queue-btn');
+        queueAllBtn.onclick = () => addReleaseToQueue(release);
     }
 
     if (release.tracks) {
         const trackList = document.createElement('div');
         trackList.className = 'track-list';
 
-        release.tracks.forEach(track => {
+        release.tracks.forEach((track, index) => {
             const trackItem = document.createElement('div');
             trackItem.className = 'track-item';
 
@@ -1103,7 +1404,7 @@ function showReleaseDetail(release) {
 
             const number = document.createElement('span');
             number.className = 'track-number';
-            number.textContent = track.trackNumber;
+            number.textContent = index + 1;
 
             const name = document.createElement('span');
             name.className = 'track-name';
@@ -1187,6 +1488,15 @@ function openReleaseModal(release) {
 function showTrackDetail(track, release) {
     hideAllSections();
 
+    // Set hash: singles use #/track/{id}, collection tracks use #/track/{id}/{1-based-index}
+    const isSingleRelease = !release.tracks;
+    if (isSingleRelease) {
+        updateHash(`#/track/${release.id}`);
+    } else {
+        const trackIndex = release.tracks.indexOf(track) + 1;
+        updateHash(`#/track/${release.id}/${trackIndex}`);
+    }
+
     // Set cover (use track cover if available, otherwise release cover)
     const cover = document.getElementById('track-detail-cover');
     const coverArt = track.coverArt || release.coverArt;
@@ -1229,10 +1539,7 @@ function showTrackDetail(track, release) {
 
     const allTags = [...(track.mood || []), ...(track.tags || [])];
     allTags.forEach(tag => {
-        const tagEl = document.createElement('span');
-        tagEl.className = 'tag';
-        tagEl.textContent = tag;
-        tagsContainer.appendChild(tagEl);
+        tagsContainer.appendChild(createTagLink(tag));
     });
 
     // Set play/queue controls
@@ -1244,11 +1551,15 @@ function showTrackDetail(track, release) {
 
     const playBtn = document.createElement('button');
     playBtn.className = 'single-play-btn';
-    playBtn.innerHTML = '▶ Play';
+    playBtn.innerHTML = '&#9654; Play';
     playBtn.onclick = (e) => {
         e.stopPropagation();
         playTrack(track, release);
     };
+
+    trackDetailPlayBtn = playBtn;
+    trackDetailTrack = track;
+    syncTrackDetailPlayBtn();
 
     const queueBtn = document.createElement('button');
     queueBtn.className = 'single-queue-btn';
