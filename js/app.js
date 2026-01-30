@@ -763,6 +763,7 @@ function updateFilteredReleases() {
     // so track-level tags work even when the parent release doesn't match)
     const activeTag = document.getElementById('tag-filter')?.value || '';
     const activeYear = document.getElementById('year-filter')?.value || '';
+    const searchQuery = (document.getElementById('search-input')?.value || '').toLowerCase();
     const allReleases = discographyData
         ? [...discographyData.albums, ...discographyData.singles].filter(r => {
             if (activeYear && r.year != activeYear) return false;
@@ -776,11 +777,14 @@ function updateFilteredReleases() {
             release.tracks.forEach(track => {
                 // Match tag on track or parent release
                 if (activeTag && !track.tags?.includes(activeTag) && !release.tags?.includes(activeTag)) return;
+                // Match search query on track
+                if (searchQuery && !trackSearchMatches(track, release, searchQuery)) return;
                 allTracks.push({ track, release });
             });
         } else {
             // Single — the release itself is the track
             if (activeTag && !release.tags?.includes(activeTag)) return;
+            if (searchQuery && !trackSearchMatches(release, release, searchQuery)) return;
             allTracks.push({ track: release, release });
         }
     });
@@ -813,6 +817,15 @@ function initializeEventListeners() {
     // Filter selects
     document.getElementById('tag-filter').addEventListener('change', handleFilters);
     document.getElementById('year-filter').addEventListener('change', handleFilters);
+
+    // Reset filters button
+    document.getElementById('reset-filters').addEventListener('click', () => {
+        document.getElementById('search-input').value = '';
+        document.getElementById('tag-filter').value = '';
+        document.getElementById('year-filter').value = '';
+        handleSearch();
+        handleFilters();
+    });
 
     // Back buttons
     document.getElementById('back-btn').addEventListener('click', goBack);
@@ -851,8 +864,17 @@ function populateFilters() {
 }
 
 // Handle search
+function trackSearchMatches(track, release, query) {
+    if (track.title.toLowerCase().includes(query)) return true;
+    if (track.description?.toLowerCase().includes(query)) return true;
+    if (track.tags?.some(tag => tag.toLowerCase().includes(query))) return true;
+    if (track.lyrics?.toLowerCase().includes(query)) return true;
+    if (release.title.toLowerCase().includes(query)) return true;
+    return false;
+}
+
 function handleSearch(e) {
-    const query = e.target.value.toLowerCase();
+    const query = (e?.target?.value ?? document.getElementById('search-input').value).toLowerCase();
 
     if (!query) {
         filteredAlbums = discographyData.albums;

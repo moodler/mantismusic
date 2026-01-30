@@ -151,48 +151,68 @@ body {
     margin-bottom: 3rem;
 }
 
-.search-bar {
-    margin-bottom: 1.5rem;
+.filter-row {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
 }
 
-.search-bar input {
-    width: 100%;
-    padding: 1rem 1.5rem;
+.filter-row input {
+    flex: 1;
+    min-width: 0;
+    height: 46px;
+    padding: 0.75rem 1.25rem;
     background: var(--bg-secondary);
     border: 1px solid var(--border);
     border-radius: 50px;
     color: var(--text-primary);
-    font-size: 1rem;
+    font-size: 0.95rem;
     outline: none;
     transition: all 0.3s ease;
 }
 
-.search-bar input:focus {
+.filter-row input:focus {
     border-color: var(--accent);
     box-shadow: 0 0 0 3px rgba(29, 185, 84, 0.1);
 }
 
-.filters {
-    display: flex;
-    gap: 1rem;
-    flex-wrap: wrap;
-}
-
-.filters select {
-    padding: 0.75rem 1.5rem;
+.filter-row select {
+    padding: 0.75rem 1.25rem;
+    height: 46px;
     background: var(--bg-secondary);
     border: 1px solid var(--border);
     border-radius: 50px;
     color: var(--text-primary);
-    font-size: 0.9rem;
+    font-size: 0.95rem;
     cursor: pointer;
     outline: none;
-    min-width: 150px;
+    flex-shrink: 0;
     transition: all 0.3s ease;
 }
 
-.filters select:hover {
+.filter-row select:hover {
     border-color: var(--accent);
+}
+
+.reset-btn {
+    width: 46px;
+    height: 46px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.reset-btn:hover {
+    border-color: var(--accent);
+    color: var(--text-primary);
 }
 
 /* Releases Section */
@@ -532,11 +552,11 @@ body {
     margin-bottom: 3rem;
 }
 
-.release-cover-container {
+.release-header .release-cover-container {
     flex-shrink: 0;
 }
 
-.release-cover {
+.release-header .release-cover {
     width: 300px;
     height: 300px;
     border-radius: 12px;
@@ -666,12 +686,16 @@ body {
         gap: 1.5rem;
     }
 
-    .filters {
-        flex-direction: column;
+    .filter-row {
+        flex-wrap: wrap;
     }
 
-    .filters select {
-        width: 100%;
+    .filter-row input {
+        flex-basis: 100%;
+    }
+
+    .filter-row select {
+        flex: 1;
     }
 
     .track-header, .release-header {
