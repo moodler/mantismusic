@@ -1585,6 +1585,31 @@ function showTrackDetail(track, release) {
 
     controlsContainer.appendChild(singleControls);
 
+    // Set streaming links
+    const streamingContainer = document.getElementById('track-detail-streaming');
+    streamingContainer.innerHTML = '';
+
+    const streamingLinks = track.streamingLinks || release.streamingLinks;
+    if (streamingLinks && Object.keys(streamingLinks).length > 0) {
+        const title = document.createElement('div');
+        title.className = 'streaming-title';
+        title.textContent = 'Listen on other platforms';
+        streamingContainer.appendChild(title);
+
+        const links = document.createElement('div');
+        links.className = 'streaming-links';
+        Object.entries(streamingLinks).forEach(([platform, url]) => {
+            if (!url) return;
+            const link = document.createElement('a');
+            link.href = url;
+            link.target = '_blank';
+            link.className = 'streaming-link';
+            link.textContent = platform.charAt(0).toUpperCase() + platform.slice(1).replace(/([A-Z])/g, ' $1');
+            links.appendChild(link);
+        });
+        streamingContainer.appendChild(links);
+    }
+
     // Find collections this track appears on
     const appearsOnSection = document.getElementById('track-appears-on-section');
     const appearsOnContainer = document.getElementById('track-appears-on');

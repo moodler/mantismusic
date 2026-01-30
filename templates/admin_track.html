@@ -1,0 +1,288 @@
+{% extends "admin_base.html" %}
+{% block title %}{% if track %}Edit: {{ track.frontmatter.get('title', slug) }}{% else %}New Track{% endif %}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="breadcrumb"><a href="/">Dashboard</a> / {% if track %}Edit Track{% else %}New Track{% endif %}</div>
+        <h1 id="page-title">{% if track %}{{ track.frontmatter.get('title', slug) }}{% else %}New Track{% endif %}</h1>
+    </div>
+    <div class="flex gap-1">
+        <button class="btn btn-primary" onclick="saveTrack()">Save</button>
+    </div>
+</div>
+
+<div class="page-content">
+    <div class="editor-layout">
+        <!-- Left column: form fields -->
+        <div>
+            <div class="form-group">
+                <label>Title</label>
+                <input type="text" class="form-input" id="field-title"
+                       value="{{ track.frontmatter.get('title', '') if track else '' }}"
+                       oninput="document.getElementById('page-title').textContent = this.value || 'Untitled'{% if not track %}; updateSlugPreview(){% endif %}">
+            </div>
+
+            {% if not track %}
+            <div class="form-group">
+                <label>Slug (folder name)</label>
+                <input type="text" class="form-input" id="field-slug" placeholder="auto-generated from title"
+                       style="color: var(--text-secondary)">
+            </div>
+            {% endif %}
+
+            <div class="form-group">
+                <label>Description</label>
+                <textarea class="form-textarea" id="field-description" rows="3">{{ track.description if track else '' }}</textarea>
+            </div>
+
+            <div class="form-group">
+                <label>Tags</label>
+                <div class="tag-input-container" id="tags-container">
+                    <input type="text" class="tag-input" placeholder="Type and press Enter...">
+                </div>
+                <input type="hidden" id="tags-hidden">
+            </div>
+
+            <div class="form-row-3">
+                <div class="form-group">
+                    <label>Duration</label>
+                    <input type="text" class="form-input" id="field-duration" placeholder="3:45"
+                           value="{{ track.frontmatter.get('duration', '') if track else '' }}">
+                </div>
+                <div class="form-group">
+                    <label>BPM</label>
+                    <input type="text" class="form-input" id="field-bpm" placeholder="120"
+                           value="{{ track.frontmatter.get('bpm', '') if track else '' }}">
+                </div>
+                <div class="form-group">
+                    <label>Key</label>
+                    <input type="text" class="form-input" id="field-key" placeholder="Am"
+                           value="{{ track.frontmatter.get('key', '') if track else '' }}">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Release Date (for singles)</label>
+                <input type="date" class="form-input" id="field-release_date"
+                       value="{{ track.frontmatter.get('release_date', '') if track else '' }}">
+            </div>
+
+            <!-- Credits -->
+            <div class="section-header mt-2">
+                <h2>Credits</h2>
+                <button class="btn btn-secondary btn-sm" onclick="addCreditRow()">+ Add Role</button>
+            </div>
+            <div id="credits-list">
+                <!-- populated by JS -->
+            </div>
+
+            <!-- Streaming Links -->
+            <div class="section-header mt-3">
+                <h2>Streaming Links</h2>
+            </div>
+            <div class="form-group">
+                <label>Spotify</label>
+                <input type="url" class="form-input" id="field-spotify"
+                       value="{{ track.frontmatter.get('spotify', '') if track else '' }}">
+            </div>
+            <div class="form-group">
+                <label>Apple Music</label>
+                <input type="url" class="form-input" id="field-apple_music"
+                       value="{{ track.frontmatter.get('apple_music', '') if track else '' }}">
+            </div>
+            <div class="form-group">
+                <label>Bandcamp</label>
+                <input type="url" class="form-input" id="field-bandcamp"
+                       value="{{ track.frontmatter.get('bandcamp', '') if track else '' }}">
+            </div>
+            <div class="form-group">
+                <label>Tidal</label>
+                <input type="url" class="form-input" id="field-tidal"
+                       value="{{ track.frontmatter.get('tidal', '') if track else '' }}">
+            </div>
+        </div>
+
+        <!-- Right column: media -->
+        <div>
+            <!-- Cover Art -->
+            <div class="form-group">
+                <label>Cover Art</label>
+                <div class="cover-zone" id="cover-zone">
+                    {% if track and track.cover_url %}
+                    <img src="{{ track.cover_url }}" alt="Cover">
+                    {% else %}
+                    <div class="cover-placeholder">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="#666"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+                        Click, paste, or drag image
+                    </div>
+                    {% endif %}
+                    <input type="file" id="cover-file-input" accept="image/*">
+                </div>
+            </div>
+
+            <!-- Audio Player -->
+            {% if track and track.audio_url %}
+            <div class="form-group mt-2">
+                <label>Audio</label>
+                <audio controls style="width: 100%; border-radius: 6px;" src="{{ track.audio_url }}"></audio>
+                <div class="text-sm text-muted mt-1">
+                    Files: {{ track.audio_files|join(', ') }}
+                </div>
+            </div>
+            {% elif track %}
+            <div class="form-group mt-2">
+                <label>Audio</label>
+                <div class="card" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                    No audio file found
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Lyrics -->
+            {% if track %}
+            <div class="form-group mt-2">
+                <label>Lyrics</label>
+                <textarea class="form-textarea" id="field-lyrics" rows="12"
+                          placeholder="Paste lyrics here...">{{ track.lyrics }}</textarea>
+                <button class="btn btn-secondary btn-sm mt-1" onclick="saveLyrics()">Save Lyrics</button>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const isNew = {{ 'true' if not track else 'false' }};
+    const slug = {{ ('"%s"' % slug)|safe if slug else 'null' }};
+
+    // Init tags
+    const initialTags = {{ (track.frontmatter.get('tags', []) if track else []) | tojson }};
+    const tagInput = initTagInput('tags-container', 'tags-hidden', initialTags);
+
+    // Init cover zone
+    {% if track %}
+    initCoverZone('cover-zone', 'cover-file-input', '/api/track/{{ slug }}/cover');
+    {% endif %}
+
+    // Init credits
+    const creditsData = {{ (track.frontmatter.get('credits', {}) if track else {}) | tojson }};
+    const creditsList = document.getElementById('credits-list');
+
+    function renderCredits() {
+        creditsList.innerHTML = '';
+        const entries = Object.entries(creditsData);
+        if (entries.length === 0) {
+            addCreditRow('composition', ['Mantis Audiogram']);
+            addCreditRow('synthesiser', ['Suno AI']);
+            addCreditRow('producer', ['Mantis Audiogram']);
+            return;
+        }
+        entries.forEach(([role, names]) => {
+            addCreditRow(role, names || []);
+        });
+    }
+
+    function addCreditRow(role = '', names = []) {
+        const row = document.createElement('div');
+        row.className = 'form-row mb-1';
+        row.style.gridTemplateColumns = '1fr 2fr auto';
+        row.innerHTML = `
+            <input type="text" class="form-input credit-role" value="${escapeHtml(role || '')}" placeholder="Role (e.g. producer)">
+            <input type="text" class="form-input credit-names" value="${escapeHtml((names || []).join(', '))}" placeholder="Names (comma-separated)">
+            <button class="btn btn-danger btn-sm" onclick="this.parentElement.remove()">&times;</button>
+        `;
+        creditsList.appendChild(row);
+    }
+
+    function getCredits() {
+        const credits = {};
+        creditsList.querySelectorAll('.form-row').forEach(row => {
+            const role = row.querySelector('.credit-role').value.trim();
+            const names = row.querySelector('.credit-names').value.split(',').map(n => n.trim()).filter(Boolean);
+            if (role && names.length) {
+                credits[role] = names;
+            }
+        });
+        return credits;
+    }
+
+    renderCredits();
+
+    // Slug preview for new tracks
+    {% if not track %}
+    function updateSlugPreview() {
+        const title = document.getElementById('field-title').value;
+        const slugField = document.getElementById('field-slug');
+        if (!slugField._manual) {
+            slugField.value = title.toLowerCase().trim().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '').replace(/_+/g, '_');
+        }
+    }
+    document.getElementById('field-slug').addEventListener('input', function() { this._manual = true; });
+    {% endif %}
+
+    // Save
+    async function saveTrack() {
+        const data = {
+            title: document.getElementById('field-title').value,
+            description: document.getElementById('field-description').value,
+            tags: JSON.parse(document.getElementById('tags-hidden').value || '[]'),
+            duration: document.getElementById('field-duration').value,
+            bpm: document.getElementById('field-bpm').value,
+            key: document.getElementById('field-key').value,
+            release_date: document.getElementById('field-release_date').value,
+            credits: getCredits(),
+            spotify: document.getElementById('field-spotify').value,
+            apple_music: document.getElementById('field-apple_music').value,
+            bandcamp: document.getElementById('field-bandcamp').value,
+            tidal: document.getElementById('field-tidal').value,
+        };
+
+        try {
+            let url, method;
+            if (isNew) {
+                url = '/api/track/create';
+                data.slug = document.getElementById('field-slug').value || undefined;
+            } else {
+                url = `/api/track/${slug}/save`;
+            }
+
+            const resp = await fetch(url, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            const result = await resp.json();
+
+            if (result.ok) {
+                showToast('Track saved');
+                if (isNew && result.slug) {
+                    window.location.href = `/track/${result.slug}`;
+                }
+            } else {
+                showToast(result.error || 'Save failed', 'error');
+            }
+        } catch (e) {
+            showToast('Error: ' + e.message, 'error');
+        }
+    }
+
+    // Save lyrics
+    async function saveLyrics() {
+        const lyrics = document.getElementById('field-lyrics').value;
+        try {
+            const resp = await fetch(`/api/track/${slug}/lyrics`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ lyrics })
+            });
+            const result = await resp.json();
+            showToast(result.ok ? 'Lyrics saved' : (result.error || 'Failed'), result.ok ? 'success' : 'error');
+        } catch (e) {
+            showToast('Error: ' + e.message, 'error');
+        }
+    }
+</script>
+{% endblock %}

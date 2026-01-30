@@ -14,5 +14,8 @@ screenshot-*.png
 node_modules/
 package-lock.json
 
+# Config (contains API secrets)
+config.json
+
 # IDE / tools
 .claude/

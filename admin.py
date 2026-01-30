@@ -1,0 +1,583 @@
+#!/usr/bin/env python3
+"""
+admin.py - Local Flask admin UI for managing music metadata.
+
+Reads/writes the YAML frontmatter .md files under music/ and provides
+a web interface for editing tracks, collections, and artist info.
+
+Usage:
+    python3 admin.py
+    # Open http://localhost:5001
+"""
+
+import base64
+import json
+import os
+import subprocess
+import yaml
+from pathlib import Path
+from flask import Flask, render_template, request, jsonify, send_from_directory
+
+app = Flask(__name__)
+
+BASE_DIR = Path(__file__).parent
+MUSIC_DIR = BASE_DIR / "music"
+TRACKS_DIR = MUSIC_DIR / "tracks"
+COLLECTIONS_DIR = MUSIC_DIR / "collections"
+
+IMAGE_EXTS = ('.jpg', '.jpeg', '.png', '.gif', '.webp')
+AUDIO_EXTS = ('.mp3', '.m4a', '.flac', '.wav')
+
+
+# ---------------------------------------------------------------------------
+# Data helpers
+# ---------------------------------------------------------------------------
+
+def parse_frontmatter(content):
+    if not content.startswith('---'):
+        return {}, content
+    parts = content.split('---', 2)
+    if len(parts) < 3:
+        return {}, content
+    try:
+        fm = yaml.safe_load(parts[1])
+        body = parts[2].strip()
+        return fm or {}, body
+    except yaml.YAMLError:
+        return {}, content
+
+
+def read_md_file(path):
+    if not path.exists():
+        return {}, ""
+    content = path.read_text(encoding='utf-8')
+    fm, body = parse_frontmatter(content)
+    for key, val in fm.items():
+        if hasattr(val, 'isoformat'):
+            fm[key] = val.isoformat()
+    return fm, body
+
+
+def write_md_file(path, frontmatter, body=""):
+    yaml_str = yaml.dump(frontmatter, default_flow_style=False,
+                         allow_unicode=True, sort_keys=False)
+    content = f"---\n{yaml_str}---\n"
+    if body:
+        content += body.strip() + "\n"
+    path.write_text(content, encoding='utf-8')
+
+
+def find_file(directory, extensions):
+    for ext in extensions:
+        for f in directory.glob(f"*{ext}"):
+            if not f.name.startswith('.'):
+                return f
+    return None
+
+
+def find_files(directory, extensions):
+    found = []
+    for ext in extensions:
+        for f in directory.glob(f"*{ext}"):
+            if not f.name.startswith('.'):
+                found.append(f)
+    return found
+
+
+def load_all_tracks():
+    tracks = {}
+    if not TRACKS_DIR.exists():
+        return tracks
+    for track_dir in sorted(TRACKS_DIR.iterdir()):
+        if not track_dir.is_dir() or track_dir.name.startswith('.'):
+            continue
+        slug = track_dir.name
+        fm, body = read_md_file(track_dir / 'track.md')
+        filenames = [f.name for f in track_dir.iterdir() if not f.name.startswith('.')]
+        audio_files = [f for f in filenames if any(f.endswith(e) for e in AUDIO_EXTS)]
+        cover_files = [f for f in filenames if any(f.endswith(e) for e in IMAGE_EXTS)]
+        lyrics_files = [f for f in filenames if f.endswith('.txt')]
+
+        tracks[slug] = {
+            'slug': slug,
+            'title': fm.get('title', slug.replace('_', ' ').title()),
+            'frontmatter': fm,
+            'description': body,
+            'has_audio': len(audio_files) > 0,
+            'has_cover': len(cover_files) > 0,
+            'has_lyrics': len(lyrics_files) > 0,
+            'audio_files': audio_files,
+            'cover_files': cover_files,
+            'lyrics_files': lyrics_files,
+            'files': filenames,
+        }
+    return tracks
+
+
+def load_all_collections():
+    collections = {}
+    if not COLLECTIONS_DIR.exists():
+        return collections
+    for coll_dir in sorted(COLLECTIONS_DIR.iterdir()):
+        if not coll_dir.is_dir() or coll_dir.name.startswith('.'):
+            continue
+        slug = coll_dir.name
+        fm, body = read_md_file(coll_dir / 'collection.md')
+        filenames = [f.name for f in coll_dir.iterdir() if not f.name.startswith('.')]
+        cover_files = [f for f in filenames if any(f.endswith(e) for e in IMAGE_EXTS)]
+
+        collections[slug] = {
+            'slug': slug,
+            'title': fm.get('title', slug.replace('_', ' ').title()),
+            'type': fm.get('type', 'album'),
+            'release_date': str(fm.get('release_date', '')),
+            'frontmatter': fm,
+            'description': body,
+            'track_slugs': fm.get('tracks', []),
+            'has_cover': len(cover_files) > 0,
+            'cover_files': cover_files,
+        }
+    return collections
+
+
+def generate_health_report():
+    tracks = load_all_tracks()
+    collections = load_all_collections()
+
+    used_slugs = set()
+    for c in collections.values():
+        used_slugs.update(c['track_slugs'])
+
+    singles = {s: t for s, t in tracks.items() if s not in used_slugs}
+    issues = []
+
+    for slug, t in tracks.items():
+        fm = t['frontmatter']
+        if not t['has_audio']:
+            issues.append({'type': 'error', 'scope': 'track', 'slug': slug,
+                           'msg': f'Track "{t["title"]}" has no audio file'})
+        if not t['has_cover']:
+            issues.append({'type': 'warning', 'scope': 'track', 'slug': slug,
+                           'msg': f'Track "{t["title"]}" has no cover art'})
+        if not t['has_lyrics'] and 'Instrumental' not in (fm.get('tags') or []):
+            issues.append({'type': 'info', 'scope': 'track', 'slug': slug,
+                           'msg': f'Track "{t["title"]}" has no lyrics file'})
+        if not fm.get('tags'):
+            issues.append({'type': 'warning', 'scope': 'track', 'slug': slug,
+                           'msg': f'Track "{t["title"]}" has no tags'})
+        if not fm.get('duration'):
+            issues.append({'type': 'warning', 'scope': 'track', 'slug': slug,
+                           'msg': f'Track "{t["title"]}" has no duration'})
+        if not fm.get('credits'):
+            issues.append({'type': 'info', 'scope': 'track', 'slug': slug,
+                           'msg': f'Track "{t["title"]}" has no credits'})
+        if not t['description']:
+            issues.append({'type': 'info', 'scope': 'track', 'slug': slug,
+                           'msg': f'Track "{t["title"]}" has no description'})
+
+    for slug, c in collections.items():
+        fm = c['frontmatter']
+        if not c['has_cover']:
+            issues.append({'type': 'error', 'scope': 'collection', 'slug': slug,
+                           'msg': f'Collection "{c["title"]}" has no cover art'})
+        if not fm.get('release_date'):
+            issues.append({'type': 'warning', 'scope': 'collection', 'slug': slug,
+                           'msg': f'Collection "{c["title"]}" has no release date'})
+        for ref in c['track_slugs']:
+            if ref not in tracks:
+                issues.append({'type': 'error', 'scope': 'collection', 'slug': slug,
+                               'msg': f'Collection "{c["title"]}" references missing track "{ref}"'})
+        if not fm.get('tags'):
+            issues.append({'type': 'warning', 'scope': 'collection', 'slug': slug,
+                           'msg': f'Collection "{c["title"]}" has no tags'})
+
+    for slug, t in singles.items():
+        fm = t['frontmatter']
+        if not fm.get('spotify') and not fm.get('apple_music'):
+            issues.append({'type': 'info', 'scope': 'track', 'slug': slug,
+                           'msg': f'Single "{t["title"]}" has no streaming links'})
+        if not fm.get('release_date'):
+            issues.append({'type': 'warning', 'scope': 'track', 'slug': slug,
+                           'msg': f'Single "{t["title"]}" has no release date'})
+
+    return {
+        'total_tracks': len(tracks),
+        'total_collections': len(collections),
+        'total_singles': len(singles),
+        'issues': issues,
+        'error_count': sum(1 for i in issues if i['type'] == 'error'),
+        'warning_count': sum(1 for i in issues if i['type'] == 'warning'),
+        'info_count': sum(1 for i in issues if i['type'] == 'info'),
+    }
+
+
+def remove_cover_images(directory):
+    for ext in IMAGE_EXTS:
+        for f in directory.glob(f"*{ext}"):
+            if not f.name.startswith('.'):
+                f.unlink()
+
+
+def capitalize_tags(tags):
+    return [t[:1].upper() + t[1:] if t else t for t in tags]
+
+
+def slugify(title):
+    slug = title.lower().strip()
+    slug = slug.replace(' ', '_')
+    slug = ''.join(c for c in slug if c.isalnum() or c == '_')
+    slug = '_'.join(part for part in slug.split('_') if part)
+    return slug
+
+
+# ---------------------------------------------------------------------------
+# Page routes
+# ---------------------------------------------------------------------------
+
+@app.route('/')
+def dashboard():
+    tracks = load_all_tracks()
+    collections = load_all_collections()
+    report = generate_health_report()
+
+    used_slugs = set()
+    for c in collections.values():
+        used_slugs.update(c['track_slugs'])
+
+    return render_template('admin_dashboard.html',
+                           tracks=tracks, collections=collections,
+                           used_slugs=used_slugs, report=report)
+
+
+@app.route('/track/new')
+def new_track():
+    return render_template('admin_track.html', track=None, slug=None,
+                           collections=load_all_collections())
+
+
+@app.route('/track/<slug>')
+def edit_track(slug):
+    track_dir = TRACKS_DIR / slug
+    if not track_dir.exists():
+        return "Track not found", 404
+    fm, body = read_md_file(track_dir / 'track.md')
+
+    # Load lyrics from .txt file
+    lyrics = ""
+    lyrics_file = find_file(track_dir, ['.txt'])
+    if lyrics_file:
+        lyrics = lyrics_file.read_text(encoding='utf-8')
+
+    # Find audio and cover files
+    audio_file = find_file(track_dir, ['.mp3', '.m4a', '.wav'])
+    cover_file = find_file(track_dir, IMAGE_EXTS)
+
+    track_data = {
+        'slug': slug,
+        'frontmatter': fm,
+        'description': body,
+        'lyrics': lyrics,
+        'audio_url': f'/music/tracks/{slug}/{audio_file.name}' if audio_file else None,
+        'cover_url': f'/music/tracks/{slug}/{cover_file.name}' if cover_file else None,
+        'audio_files': [f.name for f in find_files(track_dir, AUDIO_EXTS)],
+        'has_lyrics': lyrics_file is not None,
+    }
+    return render_template('admin_track.html', track=track_data, slug=slug,
+                           collections=load_all_collections())
+
+
+@app.route('/collection/new')
+def new_collection():
+    tracks = load_all_tracks()
+    return render_template('admin_collection.html', collection=None, slug=None,
+                           all_tracks=tracks)
+
+
+@app.route('/collection/<slug>')
+def edit_collection(slug):
+    coll_dir = COLLECTIONS_DIR / slug
+    if not coll_dir.exists():
+        return "Collection not found", 404
+    fm, body = read_md_file(coll_dir / 'collection.md')
+    cover_file = find_file(coll_dir, IMAGE_EXTS)
+
+    tracks = load_all_tracks()
+    track_details = []
+    for track_slug in fm.get('tracks', []):
+        if track_slug in tracks:
+            t = tracks[track_slug]
+            track_details.append({
+                'slug': track_slug,
+                'title': t['title'],
+                'duration': t['frontmatter'].get('duration', ''),
+                'has_audio': t['has_audio'],
+                'has_cover': t['has_cover'],
+                'has_lyrics': t['has_lyrics'],
+            })
+        else:
+            track_details.append({
+                'slug': track_slug,
+                'title': track_slug.replace('_', ' ').title(),
+                'duration': '',
+                'has_audio': False, 'has_cover': False, 'has_lyrics': False,
+                'missing': True,
+            })
+
+    coll_data = {
+        'slug': slug,
+        'frontmatter': fm,
+        'description': body,
+        'cover_url': f'/music/collections/{slug}/{cover_file.name}' if cover_file else None,
+        'track_details': track_details,
+    }
+    return render_template('admin_collection.html', collection=coll_data, slug=slug,
+                           all_tracks=tracks)
+
+
+@app.route('/artist')
+def edit_artist():
+    fm, body = read_md_file(MUSIC_DIR / 'artist.md')
+    return render_template('admin_artist.html', frontmatter=fm, bio=body)
+
+
+# ---------------------------------------------------------------------------
+# API routes
+# ---------------------------------------------------------------------------
+
+@app.route('/api/track/<slug>/save', methods=['POST'])
+def save_track(slug):
+    track_dir = TRACKS_DIR / slug
+    if not track_dir.exists():
+        return jsonify(error="Track not found"), 404
+
+    data = request.get_json()
+    description = data.pop('description', '')
+
+    # Build frontmatter from submitted data
+    fm = {}
+    if data.get('title'):
+        fm['title'] = data['title']
+    if data.get('duration'):
+        fm['duration'] = data['duration']
+    if data.get('release_date'):
+        fm['release_date'] = data['release_date']
+    if data.get('tags'):
+        fm['tags'] = capitalize_tags(data['tags'])
+    if data.get('bpm'):
+        try:
+            fm['bpm'] = int(data['bpm'])
+        except (ValueError, TypeError):
+            pass
+    if data.get('key'):
+        fm['key'] = data['key']
+    if data.get('mood'):
+        fm['mood'] = data['mood']
+    if data.get('credits'):
+        fm['credits'] = data['credits']
+
+    # Streaming links
+    for platform in ['spotify', 'apple_music', 'bandcamp', 'tidal']:
+        if data.get(platform):
+            fm[platform] = data[platform]
+
+    write_md_file(track_dir / 'track.md', fm, description)
+    return jsonify(ok=True)
+
+
+@app.route('/api/track/create', methods=['POST'])
+def create_track():
+    data = request.get_json()
+    title = data.get('title', '').strip()
+    if not title:
+        return jsonify(error="Title is required"), 400
+
+    slug = data.get('slug') or slugify(title)
+    track_dir = TRACKS_DIR / slug
+    if track_dir.exists():
+        return jsonify(error=f"Track '{slug}' already exists"), 409
+
+    track_dir.mkdir(parents=True)
+    fm = {'title': title}
+    write_md_file(track_dir / 'track.md', fm)
+    return jsonify(ok=True, slug=slug)
+
+
+@app.route('/api/track/<slug>/lyrics', methods=['POST'])
+def save_lyrics(slug):
+    track_dir = TRACKS_DIR / slug
+    if not track_dir.exists():
+        return jsonify(error="Track not found"), 404
+
+    data = request.get_json()
+    lyrics = data.get('lyrics', '')
+    lyrics_path = track_dir / f"{slug}.txt"
+
+    if lyrics.strip():
+        lyrics_path.write_text(lyrics, encoding='utf-8')
+    elif lyrics_path.exists():
+        lyrics_path.unlink()
+
+    return jsonify(ok=True)
+
+
+@app.route('/api/track/<slug>/cover', methods=['POST'])
+def upload_track_cover(slug):
+    track_dir = TRACKS_DIR / slug
+    if not track_dir.exists():
+        return jsonify(error="Track not found"), 404
+
+    remove_cover_images(track_dir)
+
+    if 'file' in request.files:
+        file = request.files['file']
+        ext = Path(file.filename).suffix or '.jpg'
+        dest = track_dir / f"{slug}{ext}"
+        file.save(str(dest))
+    elif request.is_json and request.json.get('dataUrl'):
+        data_url = request.json['dataUrl']
+        header, data = data_url.split(',', 1)
+        ext = '.png' if 'png' in header else '.jpg'
+        dest = track_dir / f"{slug}{ext}"
+        dest.write_bytes(base64.b64decode(data))
+    else:
+        return jsonify(error="No image provided"), 400
+
+    return jsonify(ok=True, url=f'/music/tracks/{slug}/{dest.name}')
+
+
+@app.route('/api/collection/<slug>/save', methods=['POST'])
+def save_collection(slug):
+    coll_dir = COLLECTIONS_DIR / slug
+    if not coll_dir.exists():
+        return jsonify(error="Collection not found"), 404
+
+    data = request.get_json()
+    description = data.pop('description', '')
+
+    fm = {}
+    if data.get('title'):
+        fm['title'] = data['title']
+    if data.get('type'):
+        fm['type'] = data['type']
+    if data.get('release_date'):
+        fm['release_date'] = data['release_date']
+    if data.get('tags'):
+        fm['tags'] = capitalize_tags(data['tags'])
+    if data.get('tracks'):
+        fm['tracks'] = data['tracks']
+
+    for platform in ['spotify', 'apple_music', 'bandcamp', 'tidal']:
+        if data.get(platform):
+            fm[platform] = data[platform]
+
+    write_md_file(coll_dir / 'collection.md', fm, description)
+    return jsonify(ok=True)
+
+
+@app.route('/api/collection/create', methods=['POST'])
+def create_collection():
+    data = request.get_json()
+    title = data.get('title', '').strip()
+    if not title:
+        return jsonify(error="Title is required"), 400
+
+    slug = data.get('slug') or slugify(title)
+    coll_dir = COLLECTIONS_DIR / slug
+    if coll_dir.exists():
+        return jsonify(error=f"Collection '{slug}' already exists"), 409
+
+    coll_dir.mkdir(parents=True)
+    fm = {'title': title, 'type': data.get('type', 'album'), 'tracks': []}
+    write_md_file(coll_dir / 'collection.md', fm)
+    return jsonify(ok=True, slug=slug)
+
+
+@app.route('/api/collection/<slug>/cover', methods=['POST'])
+def upload_collection_cover(slug):
+    coll_dir = COLLECTIONS_DIR / slug
+    if not coll_dir.exists():
+        return jsonify(error="Collection not found"), 404
+
+    remove_cover_images(coll_dir)
+
+    if 'file' in request.files:
+        file = request.files['file']
+        ext = Path(file.filename).suffix or '.jpg'
+        dest = coll_dir / f"{slug}{ext}"
+        file.save(str(dest))
+    elif request.is_json and request.json.get('dataUrl'):
+        data_url = request.json['dataUrl']
+        header, data = data_url.split(',', 1)
+        ext = '.png' if 'png' in header else '.jpg'
+        dest = coll_dir / f"{slug}{ext}"
+        dest.write_bytes(base64.b64decode(data))
+    else:
+        return jsonify(error="No image provided"), 400
+
+    return jsonify(ok=True, url=f'/music/collections/{slug}/{dest.name}')
+
+
+@app.route('/api/collection/<slug>/reorder', methods=['POST'])
+def reorder_collection(slug):
+    coll_dir = COLLECTIONS_DIR / slug
+    md_path = coll_dir / 'collection.md'
+    if not md_path.exists():
+        return jsonify(error="Collection not found"), 404
+
+    data = request.get_json()
+    new_order = data.get('tracks', [])
+
+    fm, body = read_md_file(md_path)
+    fm['tracks'] = new_order
+    write_md_file(md_path, fm, body)
+    return jsonify(ok=True)
+
+
+@app.route('/api/artist/save', methods=['POST'])
+def save_artist():
+    data = request.get_json()
+    bio = data.pop('bio', '')
+
+    fm = {}
+    if data.get('name'):
+        fm['name'] = data['name']
+    for field in ['spotify', 'apple_music', 'youtube', 'website',
+                  'bandcamp', 'soundcloud', 'instagram']:
+        if data.get(field):
+            fm[field] = data[field]
+
+    write_md_file(MUSIC_DIR / 'artist.md', fm, bio)
+    return jsonify(ok=True)
+
+
+@app.route('/api/build', methods=['POST'])
+def run_build():
+    try:
+        result = subprocess.run(
+            ['python3', str(BASE_DIR / 'build_music_json.py')],
+            capture_output=True, text=True, cwd=str(BASE_DIR), timeout=30
+        )
+        return jsonify(
+            ok=result.returncode == 0,
+            stdout=result.stdout,
+            stderr=result.stderr,
+            returncode=result.returncode
+        )
+    except subprocess.TimeoutExpired:
+        return jsonify(ok=False, stdout='', stderr='Build timed out after 30s',
+                       returncode=-1)
+
+
+@app.route('/api/health')
+def health_api():
+    return jsonify(generate_health_report())
+
+
+# Serve music files
+@app.route('/music/<path:filename>')
+def serve_music(filename):
+    return send_from_directory(str(MUSIC_DIR), filename)
+
+
+if __name__ == '__main__':
+    app.run(debug=True, port=5001)

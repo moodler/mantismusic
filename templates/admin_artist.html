@@ -1,0 +1,99 @@
+{% extends "admin_base.html" %}
+{% block title %}Artist{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="breadcrumb"><a href="/">Dashboard</a> / Artist</div>
+        <h1>Artist Profile</h1>
+    </div>
+    <div class="flex gap-1">
+        <button class="btn btn-primary" onclick="saveArtist()">Save</button>
+    </div>
+</div>
+
+<div class="page-content">
+    <div style="max-width: 640px;">
+        <div class="form-group">
+            <label>Name</label>
+            <input type="text" class="form-input" id="field-name"
+                   value="{{ frontmatter.get('name', '') }}">
+        </div>
+
+        <div class="form-group">
+            <label>Bio</label>
+            <textarea class="form-textarea" id="field-bio" rows="6">{{ bio }}</textarea>
+        </div>
+
+        <div class="section-header mt-3">
+            <h2>Social Links</h2>
+        </div>
+
+        <div class="form-group">
+            <label>Spotify</label>
+            <input type="url" class="form-input" id="field-spotify"
+                   value="{{ frontmatter.get('spotify', '') }}">
+        </div>
+        <div class="form-group">
+            <label>Apple Music</label>
+            <input type="url" class="form-input" id="field-apple_music"
+                   value="{{ frontmatter.get('apple_music', '') }}">
+        </div>
+        <div class="form-group">
+            <label>YouTube</label>
+            <input type="url" class="form-input" id="field-youtube"
+                   value="{{ frontmatter.get('youtube', '') }}">
+        </div>
+        <div class="form-group">
+            <label>Website</label>
+            <input type="url" class="form-input" id="field-website"
+                   value="{{ frontmatter.get('website', '') }}">
+        </div>
+        <div class="form-group">
+            <label>Bandcamp</label>
+            <input type="url" class="form-input" id="field-bandcamp"
+                   value="{{ frontmatter.get('bandcamp', '') }}">
+        </div>
+        <div class="form-group">
+            <label>SoundCloud</label>
+            <input type="url" class="form-input" id="field-soundcloud"
+                   value="{{ frontmatter.get('soundcloud', '') }}">
+        </div>
+        <div class="form-group">
+            <label>Instagram</label>
+            <input type="url" class="form-input" id="field-instagram"
+                   value="{{ frontmatter.get('instagram', '') }}">
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function saveArtist() {
+        const data = {
+            name: document.getElementById('field-name').value,
+            bio: document.getElementById('field-bio').value,
+            spotify: document.getElementById('field-spotify').value,
+            apple_music: document.getElementById('field-apple_music').value,
+            youtube: document.getElementById('field-youtube').value,
+            website: document.getElementById('field-website').value,
+            bandcamp: document.getElementById('field-bandcamp').value,
+            soundcloud: document.getElementById('field-soundcloud').value,
+            instagram: document.getElementById('field-instagram').value,
+        };
+
+        try {
+            const resp = await fetch('/api/artist/save', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            const result = await resp.json();
+            showToast(result.ok ? 'Artist saved' : (result.error || 'Failed'), result.ok ? 'success' : 'error');
+        } catch (e) {
+            showToast('Error: ' + e.message, 'error');
+        }
+    }
+</script>
+{% endblock %}

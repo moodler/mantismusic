@@ -1,0 +1,303 @@
+{% extends "admin_base.html" %}
+{% block title %}{% if collection %}Edit: {{ collection.frontmatter.get('title', slug) }}{% else %}New Collection{% endif %}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="breadcrumb"><a href="/">Dashboard</a> / {% if collection %}Edit Collection{% else %}New Collection{% endif %}</div>
+        <h1 id="page-title">{% if collection %}{{ collection.frontmatter.get('title', slug) }}{% else %}New Collection{% endif %}</h1>
+    </div>
+    <div class="flex gap-1">
+        <button class="btn btn-primary" onclick="saveCollection()">Save</button>
+    </div>
+</div>
+
+<div class="page-content">
+    <div class="editor-layout">
+        <!-- Left column -->
+        <div>
+            <div class="form-group">
+                <label>Title</label>
+                <input type="text" class="form-input" id="field-title"
+                       value="{{ collection.frontmatter.get('title', '') if collection else '' }}"
+                       oninput="document.getElementById('page-title').textContent = this.value || 'Untitled'{% if not collection %}; updateSlugPreview(){% endif %}">
+            </div>
+
+            {% if not collection %}
+            <div class="form-group">
+                <label>Slug (folder name)</label>
+                <input type="text" class="form-input" id="field-slug" placeholder="auto-generated from title"
+                       style="color: var(--text-secondary)">
+            </div>
+            {% endif %}
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Type</label>
+                    <select class="form-select" id="field-type">
+                        <option value="album" {% if collection and collection.frontmatter.get('type') == 'album' %}selected{% endif %}>Album</option>
+                        <option value="ep" {% if collection and collection.frontmatter.get('type') == 'ep' %}selected{% endif %}>EP</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Release Date</label>
+                    <input type="date" class="form-input" id="field-release_date"
+                           value="{{ collection.frontmatter.get('release_date', '') if collection else '' }}">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Description</label>
+                <textarea class="form-textarea" id="field-description" rows="3">{{ collection.description if collection else '' }}</textarea>
+            </div>
+
+            <div class="form-group">
+                <label>Tags</label>
+                <div class="tag-input-container" id="tags-container">
+                    <input type="text" class="tag-input" placeholder="Type and press Enter...">
+                </div>
+                <input type="hidden" id="tags-hidden">
+            </div>
+
+            <!-- Track List -->
+            <div class="section-header mt-3">
+                <h2>Tracklist</h2>
+            </div>
+            <div id="track-list">
+                <!-- populated by JS -->
+            </div>
+            <div class="mt-1" style="position: relative;">
+                <div class="form-row" style="grid-template-columns: 1fr auto;">
+                    <select class="form-select" id="add-track-select">
+                        <option value="">Add a track...</option>
+                    </select>
+                    <button class="btn btn-secondary" onclick="addTrackToList()">Add</button>
+                </div>
+            </div>
+
+            <!-- Streaming Links -->
+            <div class="section-header mt-3">
+                <h2>Streaming Links</h2>
+            </div>
+            <div class="form-group">
+                <label>Spotify</label>
+                <input type="url" class="form-input" id="field-spotify"
+                       value="{{ collection.frontmatter.get('spotify', '') if collection else '' }}">
+            </div>
+            <div class="form-group">
+                <label>Apple Music</label>
+                <input type="url" class="form-input" id="field-apple_music"
+                       value="{{ collection.frontmatter.get('apple_music', '') if collection else '' }}">
+            </div>
+            <div class="form-group">
+                <label>Bandcamp</label>
+                <input type="url" class="form-input" id="field-bandcamp"
+                       value="{{ collection.frontmatter.get('bandcamp', '') if collection else '' }}">
+            </div>
+            <div class="form-group">
+                <label>Tidal</label>
+                <input type="url" class="form-input" id="field-tidal"
+                       value="{{ collection.frontmatter.get('tidal', '') if collection else '' }}">
+            </div>
+        </div>
+
+        <!-- Right column: cover art -->
+        <div>
+            <div class="form-group">
+                <label>Cover Art</label>
+                <div class="cover-zone" id="cover-zone">
+                    {% if collection and collection.cover_url %}
+                    <img src="{{ collection.cover_url }}" alt="Cover">
+                    {% else %}
+                    <div class="cover-placeholder">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="#666"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+                        Click, paste, or drag image
+                    </div>
+                    {% endif %}
+                    <input type="file" id="cover-file-input" accept="image/*">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const isNew = {{ 'true' if not collection else 'false' }};
+    const slug = {{ ('"%s"' % slug)|safe if slug else 'null' }};
+
+    // All available tracks
+    const allTracks = {{ all_tracks | tojson }};
+
+    // Current track order
+    let trackOrder = {{ (collection.frontmatter.get('tracks', []) if collection else []) | tojson }};
+
+    // Track details (for display)
+    const trackDetails = {};
+    {% if collection and collection.track_details %}
+    {{ collection.track_details | tojson }}.forEach(t => { trackDetails[t.slug] = t; });
+    {% endif %}
+    // Also populate from allTracks for add dropdown
+    Object.entries(allTracks).forEach(([slug, t]) => {
+        if (!trackDetails[slug]) {
+            trackDetails[slug] = {
+                slug: slug,
+                title: t.title,
+                duration: t.frontmatter?.duration || '',
+                has_audio: t.has_audio,
+                has_cover: t.has_cover,
+                has_lyrics: t.has_lyrics,
+            };
+        }
+    });
+
+    // Init tags
+    const initialTags = {{ (collection.frontmatter.get('tags', []) if collection else []) | tojson }};
+    initTagInput('tags-container', 'tags-hidden', initialTags);
+
+    // Init cover zone
+    {% if collection %}
+    initCoverZone('cover-zone', 'cover-file-input', '/api/collection/{{ slug }}/cover');
+    {% endif %}
+
+    // Track list rendering
+    const trackListEl = document.getElementById('track-list');
+
+    function renderTrackList() {
+        trackListEl.innerHTML = '';
+        trackOrder.forEach((slug, idx) => {
+            const t = trackDetails[slug] || { slug, title: slug.replace(/_/g, ' '), duration: '' };
+            const item = document.createElement('div');
+            item.className = 'track-list-item';
+            item.draggable = true;
+            item.dataset.index = idx;
+            item.innerHTML = `
+                <span class="drag-handle">&#x2630;</span>
+                <span class="track-num">${idx + 1}</span>
+                <span class="track-title"><a href="/track/${slug}" style="color: inherit; text-decoration: none;" target="_blank">${escapeHtml(t.title)}</a></span>
+                <span class="track-duration">${t.duration || ''}</span>
+                <span class="status-icons">
+                    <span class="status-dot ${t.has_audio ? 'ok' : 'missing'}" title="${t.has_audio ? 'Has audio' : 'No audio'}"></span>
+                    <span class="status-dot ${t.has_cover ? 'ok' : 'missing'}" title="${t.has_cover ? 'Has cover' : 'No cover'}"></span>
+                    <span class="status-dot ${t.has_lyrics ? 'ok' : 'missing'}" title="${t.has_lyrics ? 'Has lyrics' : 'No lyrics'}"></span>
+                </span>
+                <button class="remove-track" onclick="removeTrack(${idx})" title="Remove">&times;</button>
+            `;
+
+            // Drag events
+            item.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', idx);
+                item.style.opacity = '0.5';
+            });
+            item.addEventListener('dragend', () => { item.style.opacity = ''; });
+            item.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                item.classList.add('drag-over');
+            });
+            item.addEventListener('dragleave', () => { item.classList.remove('drag-over'); });
+            item.addEventListener('drop', (e) => {
+                e.preventDefault();
+                item.classList.remove('drag-over');
+                const fromIdx = parseInt(e.dataTransfer.getData('text/plain'));
+                const toIdx = idx;
+                if (fromIdx !== toIdx) {
+                    const [moved] = trackOrder.splice(fromIdx, 1);
+                    trackOrder.splice(toIdx, 0, moved);
+                    renderTrackList();
+                }
+            });
+
+            trackListEl.appendChild(item);
+        });
+
+        updateAddDropdown();
+    }
+
+    function removeTrack(idx) {
+        trackOrder.splice(idx, 1);
+        renderTrackList();
+    }
+
+    function updateAddDropdown() {
+        const select = document.getElementById('add-track-select');
+        const inList = new Set(trackOrder);
+        select.innerHTML = '<option value="">Add a track...</option>';
+        Object.keys(allTracks).sort().forEach(slug => {
+            if (!inList.has(slug)) {
+                const t = allTracks[slug];
+                const opt = document.createElement('option');
+                opt.value = slug;
+                opt.textContent = t.title;
+                select.appendChild(opt);
+            }
+        });
+    }
+
+    function addTrackToList() {
+        const select = document.getElementById('add-track-select');
+        const slug = select.value;
+        if (!slug) return;
+        trackOrder.push(slug);
+        renderTrackList();
+    }
+
+    renderTrackList();
+
+    // Slug preview for new
+    {% if not collection %}
+    function updateSlugPreview() {
+        const title = document.getElementById('field-title').value;
+        const slugField = document.getElementById('field-slug');
+        if (!slugField._manual) {
+            slugField.value = title.toLowerCase().trim().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '').replace(/_+/g, '_');
+        }
+    }
+    document.getElementById('field-slug').addEventListener('input', function() { this._manual = true; });
+    {% endif %}
+
+    // Save
+    async function saveCollection() {
+        const data = {
+            title: document.getElementById('field-title').value,
+            type: document.getElementById('field-type').value,
+            release_date: document.getElementById('field-release_date').value,
+            description: document.getElementById('field-description').value,
+            tags: JSON.parse(document.getElementById('tags-hidden').value || '[]'),
+            tracks: trackOrder,
+            spotify: document.getElementById('field-spotify').value,
+            apple_music: document.getElementById('field-apple_music').value,
+            bandcamp: document.getElementById('field-bandcamp').value,
+            tidal: document.getElementById('field-tidal').value,
+        };
+
+        try {
+            let url;
+            if (isNew) {
+                url = '/api/collection/create';
+                data.slug = document.getElementById('field-slug')?.value || undefined;
+            } else {
+                url = `/api/collection/${slug}/save`;
+            }
+
+            const resp = await fetch(url, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            const result = await resp.json();
+
+            if (result.ok) {
+                showToast('Collection saved');
+                if (isNew && result.slug) {
+                    window.location.href = `/collection/${result.slug}`;
+                }
+            } else {
+                showToast(result.error || 'Save failed', 'error');
+            }
+        } catch (e) {
+            showToast('Error: ' + e.message, 'error');
+        }
+    }
+</script>
+{% endblock %}

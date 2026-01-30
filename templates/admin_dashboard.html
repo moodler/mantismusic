@@ -1,0 +1,135 @@
+{% extends "admin_base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Dashboard</h1>
+</div>
+
+<div class="page-content">
+    <!-- Stats -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value">{{ report.total_tracks }}</div>
+            <div class="stat-label">Total Tracks</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ report.total_collections }}</div>
+            <div class="stat-label">Collections</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ report.total_singles }}</div>
+            <div class="stat-label">Singles</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" style="color: {% if report.error_count %}var(--error){% elif report.warning_count %}var(--warning){% else %}var(--accent){% endif %}">
+                {{ report.error_count + report.warning_count }}
+            </div>
+            <div class="stat-label">Issues</div>
+        </div>
+    </div>
+
+    <!-- Health Report -->
+    {% if report.issues %}
+    <div class="section-header">
+        <h2>Health Report</h2>
+    </div>
+    <div class="card mb-2">
+        <div class="issue-filters">
+            <button class="issue-filter-btn active" onclick="filterIssues('all', this)">
+                All ({{ report.issues|length }})
+            </button>
+            {% if report.error_count %}
+            <button class="issue-filter-btn" onclick="filterIssues('error', this)">
+                Errors ({{ report.error_count }})
+            </button>
+            {% endif %}
+            {% if report.warning_count %}
+            <button class="issue-filter-btn" onclick="filterIssues('warning', this)">
+                Warnings ({{ report.warning_count }})
+            </button>
+            {% endif %}
+            {% if report.info_count %}
+            <button class="issue-filter-btn" onclick="filterIssues('info', this)">
+                Info ({{ report.info_count }})
+            </button>
+            {% endif %}
+        </div>
+        <div id="issues-list">
+            {% for issue in report.issues %}
+            <div class="issue-row" data-type="{{ issue.type }}">
+                <span class="issue-dot {{ issue.type }}"></span>
+                <span class="issue-msg">{{ issue.msg }}</span>
+                <a class="issue-link" href="/{{ issue.scope }}/{{ issue.slug }}">Edit</a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <div class="card mb-2">
+        <div class="no-issues">All data looks good - no issues found.</div>
+    </div>
+    {% endif %}
+
+    <!-- Collections -->
+    <div class="section-header mt-3">
+        <h2>Collections</h2>
+        <a href="/collection/new" class="btn btn-secondary btn-sm">+ New Collection</a>
+    </div>
+    <div class="item-grid mb-2">
+        {% for slug, coll in collections.items() %}
+        <a class="item-card" href="/collection/{{ slug }}">
+            <div class="item-card-cover">
+                {% if coll.has_cover %}
+                <img src="/music/collections/{{ slug }}/{{ coll.cover_files[0] }}" alt="">
+                {% else %}
+                {{ coll.title[:2]|upper }}
+                {% endif %}
+            </div>
+            <div class="item-card-info">
+                <div class="item-card-title">{{ coll.title }}</div>
+                <div class="item-card-subtitle">{{ coll.type|capitalize }} &middot; {{ coll.track_slugs|length }} tracks</div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+
+    <!-- All Tracks -->
+    <div class="section-header mt-3">
+        <h2>Tracks</h2>
+        <a href="/track/new" class="btn btn-secondary btn-sm">+ New Track</a>
+    </div>
+    <div class="item-grid">
+        {% for slug, t in tracks.items() %}
+        <a class="item-card" href="/track/{{ slug }}">
+            <div class="item-card-cover">
+                {% if t.has_cover %}
+                <img src="/music/tracks/{{ slug }}/{{ t.cover_files[0] }}" alt="">
+                {% else %}
+                {{ t.title[:2]|upper }}
+                {% endif %}
+            </div>
+            <div class="item-card-info">
+                <div class="item-card-title">{{ t.title }}</div>
+                <div class="item-card-subtitle">
+                    {{ t.frontmatter.get('duration', '') }}
+                    {% if slug not in used_slugs %}&middot; Single{% endif %}
+                </div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function filterIssues(type, btn) {
+    document.querySelectorAll('.issue-filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.issue-row').forEach(row => {
+        row.style.display = (type === 'all' || row.dataset.type === type) ? '' : 'none';
+    });
+}
+</script>
+{% endblock %}
