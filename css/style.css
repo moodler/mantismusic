@@ -196,13 +196,13 @@ body::before {
 }
 
 .about-profile {
-    width: 180px;
-    height: 180px;
+    width: 270px;
+    height: 270px;
     border-radius: 50%;
     object-fit: cover;
     border: 4px solid var(--bg-secondary);
     display: block;
-    margin: -90px auto 1.5rem;
+    margin: -35px auto 1.5rem;
     position: relative;
     z-index: 1;
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
@@ -237,10 +237,7 @@ body::before {
     margin-right: auto;
 }
 
-.social-links {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1rem;
+.about-content .streaming-links {
     justify-content: center;
 }
 
@@ -338,6 +335,17 @@ body::before {
 .releases-section {
     margin-bottom: 4rem;
     animation: fadeIn 0.5s ease;
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.section-header .section-title {
+    margin-bottom: 0;
 }
 
 .section-title {
@@ -819,9 +827,9 @@ body::before {
     }
 
     .about-profile {
-        width: 120px;
-        height: 120px;
-        margin-top: -60px;
+        width: 180px;
+        height: 180px;
+        margin-top: -90px;
     }
 
     .about-content {
@@ -1602,7 +1610,6 @@ body::before {
 
 /* Play All Button */
 .play-all-btn {
-    grid-column: 1 / -1;
     display: inline-flex;
     align-items: center;
     justify-content: center;

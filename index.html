@@ -30,9 +30,6 @@
     <!-- Hero Banner -->
     <section id="hero-section" class="hero-section hidden">
         <div class="hero-overlay"></div>
-        <div class="hero-content container">
-            <h2 class="hero-title">Mantis Audiogram</h2>
-        </div>
     </section>
 
     <!-- Main Content -->
@@ -42,8 +39,8 @@
             <section id="about-section" class="about-section hidden">
                 <div class="about-content">
                     <h2>About the Artist</h2>
-                    <p id="artist-bio"></p>
-                    <div class="social-links" id="social-links"></div>
+                    <div id="artist-bio"></div>
+                    <div class="streaming-links" id="social-links"></div>
                 </div>
             </section>
 
@@ -74,7 +71,10 @@
 
             <!-- Tracks Section -->
             <section id="tracks-section" class="releases-section hidden">
-                <h2 class="section-title">Tracks</h2>
+                <div class="section-header">
+                    <h2 class="section-title">Tracks</h2>
+                    <button id="play-all-btn" class="play-all-btn hidden">&#9654;&ensp;Play all</button>
+                </div>
                 <div id="tracks-grid" class="releases-grid"></div>
             </section>
 
@@ -119,6 +119,7 @@
                     <div class="detail-info">
                         <h1 id="track-detail-title"></h1>
                         <p id="track-detail-year" class="detail-year"></p>
+                        <div id="track-detail-description" class="detail-description"></div>
                         <div id="track-detail-meta" class="detail-meta"></div>
                         <div id="track-detail-tags" class="detail-tags"></div>
                         <div id="track-detail-controls" class="detail-streaming"></div>

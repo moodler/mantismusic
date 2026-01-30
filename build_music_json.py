@@ -159,8 +159,8 @@ def parse_artist():
     frontmatter, bio = read_md_file(artist_md)
 
     social_links = {}
-    social_fields = ['spotify', 'apple_music', 'bandcamp', 'soundcloud',
-                     'youtube', 'instagram', 'website']
+    social_fields = ['spotify', 'apple_music', 'tidal', 'deezer', 'bandcamp',
+                     'soundcloud', 'youtube', 'instagram', 'website']
 
     for field in social_fields:
         if frontmatter.get(field):
