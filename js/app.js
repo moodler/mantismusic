@@ -1,3 +1,26 @@
+// Streaming platform SVG icons
+const PLATFORM_ICONS = {
+    spotify: '<svg viewBox="0 0 24 24"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.6 0 12 0zm5.52 17.28c-.24.36-.66.48-1.02.24-2.82-1.74-6.36-2.1-10.56-1.14-.42.12-.78-.18-.9-.54-.12-.42.18-.78.54-.9 4.56-1.02 8.52-.6 11.7 1.32.36.22.48.66.24 1.02zm1.44-3.3c-.3.42-.84.6-1.26.3-3.24-1.98-8.16-2.58-11.94-1.38-.48.12-.99-.12-1.14-.6-.12-.48.12-.99.6-1.14 4.38-1.32 9.78-.66 13.5 1.62.36.18.54.78.24 1.2zm.12-3.36C15.24 8.4 8.88 8.16 5.16 9.3c-.6.18-1.2-.18-1.38-.78-.18-.6.18-1.2.78-1.38 4.26-1.26 11.28-1.02 15.72 1.62.54.3.72 1.02.42 1.56-.3.42-1.02.6-1.56.3z"/></svg>',
+    appleMusic: '<svg viewBox="0 0 24 24"><path d="M23.99 6.73c0-.13-.01-.27-.01-.4a5.85 5.85 0 0 0-.48-2.18c-.43-.94-1.07-1.76-1.88-2.38A6.17 6.17 0 0 0 19.44.5 10.7 10.7 0 0 0 18.1.2c-.44-.07-.87-.1-1.31-.13-.12 0-.24-.01-.36-.02H7.56c-.12.01-.24.02-.36.02-.44.03-.87.06-1.31.13-.51.09-1 .23-1.47.44A5.9 5.9 0 0 0 2.06 2.3 5.89 5.89 0 0 0 .68 4.73c-.14.5-.24 1.02-.3 1.54-.04.31-.06.63-.07.94v9.58c.01.31.03.63.07.94.06.52.16 1.04.3 1.54.29.97.78 1.84 1.47 2.58a5.73 5.73 0 0 0 2.4 1.59c.47.18.96.31 1.46.39.44.07.88.1 1.32.13.12.01.24.02.36.02h8.91c.12-.01.24-.01.36-.02.44-.03.88-.06 1.32-.13a6.1 6.1 0 0 0 1.46-.4 5.62 5.62 0 0 0 2.39-1.83 5.82 5.82 0 0 0 1.04-2.34c.14-.5.24-1.02.3-1.54.04-.31.06-.63.07-.94V6.73zm-6.72 5.2v4.81c0 .48-.06.95-.28 1.38a2.12 2.12 0 0 1-1.24 1.05c-.36.13-.73.2-1.11.22-.84.06-1.61-.42-1.86-1.2a1.76 1.76 0 0 1 .82-2.06c.35-.2.73-.33 1.12-.42.4-.1.8-.17 1.19-.29.32-.1.48-.32.5-.65V10.4c0-.1-.04-.2-.13-.24-.09-.05-.19-.03-.28 0l-4.88 1.04c-.08.02-.15.05-.2.11-.05.07-.07.15-.07.23v6.27c.01.46-.04.93-.24 1.36a2.13 2.13 0 0 1-1.15 1.1c-.38.15-.78.23-1.18.26-.84.06-1.61-.42-1.86-1.2a1.76 1.76 0 0 1 .82-2.06c.35-.2.73-.33 1.12-.42.4-.1.8-.18 1.19-.29.32-.1.49-.32.5-.65V7.67c0-.3.1-.55.36-.72.17-.11.36-.18.56-.23l5.72-1.23c.24-.05.49-.1.74-.1.34 0 .63.14.78.47.07.16.1.33.1.5z"/></svg>',
+    tidal: '<svg viewBox="0 0 24 24"><polygon points="4,7 7,4 10,7 7,10"/><polygon points="10,7 13,4 16,7 13,10"/><polygon points="16,7 19,4 22,7 19,10"/><polygon points="10,13 13,10 16,13 13,16"/></svg>',
+    deezer: '<svg viewBox="0 0 24 24"><rect x="0" y="18.1" width="3.6" height="1.8"/><rect x="0" y="15.5" width="3.6" height="1.8"/><rect x="0" y="12.9" width="3.6" height="1.8"/><rect x="4.8" y="18.1" width="3.6" height="1.8"/><rect x="4.8" y="15.5" width="3.6" height="1.8"/><rect x="4.8" y="12.9" width="3.6" height="1.8"/><rect x="4.8" y="10.3" width="3.6" height="1.8"/><rect x="4.8" y="7.7" width="3.6" height="1.8"/><rect x="9.6" y="18.1" width="3.6" height="1.8"/><rect x="9.6" y="15.5" width="3.6" height="1.8"/><rect x="9.6" y="12.9" width="3.6" height="1.8"/><rect x="9.6" y="10.3" width="3.6" height="1.8"/><rect x="14.4" y="18.1" width="3.6" height="1.8"/><rect x="14.4" y="15.5" width="3.6" height="1.8"/><rect x="14.4" y="12.9" width="3.6" height="1.8"/><rect x="14.4" y="10.3" width="3.6" height="1.8"/><rect x="14.4" y="7.7" width="3.6" height="1.8"/><rect x="14.4" y="5.1" width="3.6" height="1.8"/><rect x="14.4" y="2.5" width="3.6" height="1.8"/><rect x="19.2" y="18.1" width="3.6" height="1.8"/><rect x="19.2" y="15.5" width="3.6" height="1.8"/><rect x="19.2" y="12.9" width="3.6" height="1.8"/><rect x="19.2" y="10.3" width="3.6" height="1.8"/><rect x="19.2" y="7.7" width="3.6" height="1.8"/></svg>',
+    youtube: '<svg viewBox="0 0 24 24"><path d="M23.5 6.19a3.02 3.02 0 0 0-2.12-2.14C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.38.55A3.02 3.02 0 0 0 .5 6.19 31.6 31.6 0 0 0 0 12a31.6 31.6 0 0 0 .5 5.81 3.02 3.02 0 0 0 2.12 2.14c1.88.55 9.38.55 9.38.55s7.5 0 9.38-.55a3.02 3.02 0 0 0 2.12-2.14A31.6 31.6 0 0 0 24 12a31.6 31.6 0 0 0-.5-5.81zM9.54 15.57V8.43L15.82 12l-6.28 3.57z"/></svg>',
+    bandcamp: '<svg viewBox="0 0 24 24"><path d="M0 18.75l7.44-13.5H24l-7.44 13.5z"/></svg>',
+    soundcloud: '<svg viewBox="0 0 24 24"><path d="M1.18 13.87c-.07 0-.13.06-.14.13l-.35 2.01.35 1.97c.01.07.07.13.14.13s.13-.06.14-.13l.42-1.97-.42-2.01c-.01-.07-.07-.13-.14-.13zm1.78-1.37c-.07 0-.14.06-.15.14l-.37 3.38.37 3.28c.01.08.08.14.15.14s.14-.06.15-.14l.43-3.28-.43-3.38c-.01-.08-.08-.14-.15-.14zm1.81-.52c-.08 0-.15.07-.16.15l-.32 3.9.32 3.48c.01.08.08.15.16.15s.15-.07.16-.15l.37-3.48-.37-3.9c-.01-.08-.08-.15-.16-.15zm1.81-.16c-.09 0-.16.07-.17.16l-.3 4.06.3 3.56c.01.09.08.16.17.16s.16-.07.17-.16l.34-3.56-.34-4.06c-.01-.09-.08-.16-.17-.16zm1.83-.52c-.1 0-.17.08-.18.17l-.27 4.58.27 3.58c.01.09.08.17.18.17s.17-.08.18-.17l.31-3.58-.31-4.58c-.01-.09-.08-.17-.18-.17zm1.83.1c-.1 0-.18.08-.19.18l-.24 4.48.24 3.54c.01.1.09.18.19.18s.18-.08.19-.18l.28-3.54-.28-4.48c-.01-.1-.09-.18-.19-.18zm1.84-.82c-.11 0-.19.09-.2.19l-.24 5.3.24 3.46c.01.1.09.19.2.19s.19-.09.2-.19l.27-3.46-.27-5.3c-.01-.1-.09-.19-.2-.19zm1.85-.1c-.11 0-.2.09-.21.2l-.22 5.4.22 3.44c.01.11.1.2.21.2s.2-.09.21-.2l.25-3.44-.25-5.4c-.01-.11-.1-.2-.21-.2zm3.57-2.17c-.2 0-.38.03-.57.08a7.54 7.54 0 0 0-7.3-5.87c-.65 0-1.29.1-1.88.27-.22.07-.28.14-.28.28v11.56c.01.14.11.25.25.27h9.78a3.3 3.3 0 0 0 3.3-3.3 3.3 3.3 0 0 0-3.3-3.29z"/></svg>'
+};
+
+// Build a streaming link element with platform icon
+function createStreamingLink(platform, url) {
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = '_blank';
+    link.className = 'streaming-link';
+    const label = platform.charAt(0).toUpperCase() + platform.slice(1).replace(/([A-Z])/g, ' $1');
+    link.title = label;
+    link.innerHTML = PLATFORM_ICONS[platform] || `<span style="font-size:0.7rem">${label}</span>`;
+    return link;
+}
+
 // Configuration - point this to your data server
 const CONFIG = {
     dataBaseUrl: ''  // Empty for local, or 'https://music.example.com/data' for remote
@@ -169,6 +192,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     loadMostRecentTrack();
+    applyBrandColors();
 });
 
 // Initialize audio player
@@ -627,9 +651,10 @@ function updatePlayerUI() {
         playerCover.style.backgroundPosition = 'center';
         playerCover.textContent = '';
     } else {
-        playerCover.style.backgroundImage = '';
-        playerCover.style.background = currentRelease.backgroundColor || 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-        playerCover.textContent = currentTrack.title.substring(0, 2).toUpperCase();
+        playerCover.style.backgroundImage = 'url(music/profile.jpg)';
+        playerCover.style.backgroundSize = 'cover';
+        playerCover.style.backgroundPosition = 'center';
+        playerCover.textContent = '';
     }
 
     const playerTitle = document.getElementById('player-title');
@@ -665,6 +690,94 @@ function updatePlayerUI() {
     };
     playerCover.onclick = goToTrack;
     playerTitle.onclick = goToTrack;
+}
+
+// Extract two dominant color clusters from the profile image and apply
+// as a gradient to all branded text elements (.logo, .about-content h2)
+function applyBrandColors() {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 50;
+        canvas.height = 50;
+        ctx.drawImage(img, 0, 0, 50, 50);
+
+        const imageData = ctx.getImageData(0, 0, 50, 50).data;
+        const pixels = [];
+
+        // Collect saturated, mid-brightness pixels
+        for (let i = 0; i < imageData.length; i += 4) {
+            const r = imageData[i], g = imageData[i + 1], b = imageData[i + 2];
+            const max = Math.max(r, g, b), min = Math.min(r, g, b);
+            const brightness = (r + g + b) / 3;
+            const saturation = max === 0 ? 0 : (max - min) / max;
+            // Only keep colorful pixels (not too dark, not too bright, reasonably saturated)
+            if (brightness > 40 && brightness < 220 && saturation > 0.2) {
+                pixels.push([r, g, b]);
+            }
+        }
+
+        if (pixels.length < 2) return; // not enough data
+
+        // Simple 2-means clustering: split pixels by hue into warm vs cool
+        const warm = []; // hue 0-60 or 300-360 (reds, oranges, yellows)
+        const cool = []; // hue 60-300 (greens, blues, purples)
+
+        pixels.forEach(([r, g, b]) => {
+            const max = Math.max(r, g, b), min = Math.min(r, g, b);
+            let hue = 0;
+            if (max !== min) {
+                const d = max - min;
+                if (max === r) hue = ((g - b) / d + (g < b ? 6 : 0)) * 60;
+                else if (max === g) hue = ((b - r) / d + 2) * 60;
+                else hue = ((r - g) / d + 4) * 60;
+            }
+            if (hue < 80 || hue > 300) {
+                warm.push([r, g, b]);
+            } else {
+                cool.push([r, g, b]);
+            }
+        });
+
+        function avgColor(arr) {
+            if (arr.length === 0) return null;
+            const sum = arr.reduce((acc, c) => [acc[0] + c[0], acc[1] + c[1], acc[2] + c[2]], [0, 0, 0]);
+            return sum.map(v => Math.round(v / arr.length));
+        }
+
+        // Boost saturation slightly to make text gradient vivid
+        function boost([r, g, b]) {
+            const max = Math.max(r, g, b), min = Math.min(r, g, b);
+            const mid = (max + min) / 2;
+            const factor = 1.3;
+            return [
+                Math.min(255, Math.round(mid + (r - mid) * factor)),
+                Math.min(255, Math.round(mid + (g - mid) * factor)),
+                Math.min(255, Math.round(mid + (b - mid) * factor))
+            ];
+        }
+
+        let color1 = avgColor(warm.length > 0 ? warm : pixels.slice(0, Math.floor(pixels.length / 2)));
+        let color2 = avgColor(cool.length > 0 ? cool : pixels.slice(Math.floor(pixels.length / 2)));
+
+        if (!color1 || !color2) return;
+
+        color1 = boost(color1);
+        color2 = boost(color2);
+
+        const gradient = `linear-gradient(135deg, rgb(${color1.join(',')}) 0%, rgb(${color2.join(',')}) 100%)`;
+
+        // Apply to all branded text elements
+        document.querySelectorAll('.logo, .about-content h2').forEach(el => {
+            el.style.background = gradient;
+            el.style.webkitBackgroundClip = 'text';
+            el.style.webkitTextFillColor = 'transparent';
+            el.style.backgroundClip = 'text';
+        });
+    };
+    img.src = 'music/profile.jpg';
 }
 
 // Extract dominant color from an image and apply gradient to an element
@@ -960,6 +1073,7 @@ function createTagLink(tagText) {
 
 // Hide all content sections
 function hideAllSections() {
+    document.getElementById('hero-section').classList.add('hidden');
     document.getElementById('about-section').classList.add('hidden');
     document.getElementById('controls-section').classList.add('hidden');
     document.getElementById('discography-section').classList.add('hidden');
@@ -982,12 +1096,14 @@ function renderView() {
             renderAbout();
             break;
         case 'collections':
+            document.getElementById('hero-section').classList.remove('hidden');
             document.getElementById('controls-section').classList.remove('hidden');
             document.getElementById('collections-section').classList.remove('hidden');
             renderCollections();
             break;
         case 'tracks':
         default:
+            document.getElementById('hero-section').classList.remove('hidden');
             document.getElementById('controls-section').classList.remove('hidden');
             document.getElementById('tracks-section').classList.remove('hidden');
             renderTracks();
@@ -1022,6 +1138,22 @@ function renderDiscography() {
 
 // Render about section
 function renderAbout() {
+    const aboutContent = document.querySelector('.about-content');
+
+    // Inject banner + profile if not already present
+    if (!document.querySelector('.about-banner')) {
+        const banner = document.createElement('div');
+        banner.className = 'about-banner';
+        banner.style.backgroundImage = 'url(music/banner.png)';
+        aboutContent.insertBefore(banner, aboutContent.firstChild);
+
+        const profile = document.createElement('img');
+        profile.className = 'about-profile';
+        profile.src = 'music/profile.jpg';
+        profile.alt = 'Mantis Audiogram';
+        banner.insertAdjacentElement('afterend', profile);
+    }
+
     document.getElementById('about-section').classList.remove('hidden');
     document.getElementById('artist-bio').textContent = discographyData.bio;
 
@@ -1374,13 +1506,8 @@ function showReleaseDetail(release) {
         const links = document.createElement('div');
         links.className = 'streaming-links';
         Object.entries(release.streamingLinks).forEach(([platform, url]) => {
-            if (!url) return; // Skip empty links
-            const link = document.createElement('a');
-            link.href = url;
-            link.target = '_blank';
-            link.className = 'streaming-link';
-            link.textContent = platform.charAt(0).toUpperCase() + platform.slice(1).replace(/([A-Z])/g, ' $1');
-            links.appendChild(link);
+            if (!url) return;
+            links.appendChild(createStreamingLink(platform, url));
         });
         streamingContainer.appendChild(links);
     }
@@ -1622,12 +1749,7 @@ function showTrackDetail(track, release) {
         links.className = 'streaming-links';
         Object.entries(streamingLinks).forEach(([platform, url]) => {
             if (!url) return;
-            const link = document.createElement('a');
-            link.href = url;
-            link.target = '_blank';
-            link.className = 'streaming-link';
-            link.textContent = platform.charAt(0).toUpperCase() + platform.slice(1).replace(/([A-Z])/g, ' $1');
-            links.appendChild(link);
+            links.appendChild(createStreamingLink(platform, url));
         });
         streamingContainer.appendChild(links);
     }

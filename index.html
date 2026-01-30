@@ -14,7 +14,10 @@
     <header class="header">
         <div class="container">
             <div class="header-content">
-                <h1 class="logo" style="cursor:pointer" onclick="currentView='tracks';navigationHistory=[];document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.view==='tracks'));renderView();">Mantis Audiogram</h1>
+                <div class="logo-group" style="cursor:pointer" onclick="currentView='tracks';navigationHistory=[];document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.view==='tracks'));renderView();">
+                    <img src="music/profile.jpg" alt="Mantis Audiogram" class="header-avatar">
+                    <h1 class="logo">Mantis Audiogram</h1>
+                </div>
                 <nav class="nav">
                     <button class="nav-btn active" data-view="tracks">Tracks</button>
                     <button class="nav-btn" data-view="collections">Collections</button>
@@ -23,6 +26,14 @@
             </div>
         </div>
     </header>
+
+    <!-- Hero Banner -->
+    <section id="hero-section" class="hero-section hidden">
+        <div class="hero-overlay"></div>
+        <div class="hero-content container">
+            <h2 class="hero-title">Mantis Audiogram</h2>
+        </div>
+    </section>
 
     <!-- Main Content -->
     <main class="main">
