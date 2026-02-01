@@ -118,15 +118,16 @@ function findReleaseById(id) {
 // Find a track by slug across all releases; returns { track, release } or null
 function findTrackBySlug(slug) {
     if (!discographyData) return null;
-    // Check singles first (their id IS the slug)
-    const single = discographyData.singles.find(s => s.id === slug);
-    if (single) return { track: single, release: single };
-    // Check tracks within all releases (albums and EPs)
+    // Check tracks within all releases first (albums and EPs)
+    // This handles the case where an EP and its track share the same slug
     for (const release of [...discographyData.albums, ...discographyData.singles]) {
         if (!release.tracks) continue;
         const track = release.tracks.find(t => t.slug === slug);
         if (track) return { track, release };
     }
+    // Check standalone singles (their id IS the slug, no nested tracks)
+    const single = discographyData.singles.find(s => s.id === slug && !s.tracks);
+    if (single) return { track: single, release: single };
     return null;
 }
 
