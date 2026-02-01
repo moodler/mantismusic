@@ -705,10 +705,7 @@ def run_build():
 def run_preview():
     """Open the built site in the default browser via file:// URL."""
     import webbrowser
-    # Use the build-generated index.html if available, otherwise the source
-    generated = DATA_OUTPUT_DIR / 'index.html'
-    target = generated if generated.exists() else INDEX_HTML
-    webbrowser.open(f'file://{target}')
+    webbrowser.open(f'file://{INDEX_HTML}')
     return jsonify(ok=True)
 
 
