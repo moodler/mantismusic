@@ -869,13 +869,24 @@ function formatDate(dateStr) {
     return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
 }
 
-// Convert text with blank-line paragraphs to HTML paragraphs
+// Convert text with blank-line paragraphs to HTML paragraphs (supports basic Markdown)
 function textToHtml(text) {
     if (!text) return '';
     return text.split(/\n\s*\n/)
         .map(p => p.trim())
         .filter(p => p)
-        .map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`)
+        .map(p => {
+            let html = p.replace(/\n/g, '<br>');
+            // Markdown links: [text](url)
+            html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+            // Bold: **text**
+            html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            // Italic: *text*
+            html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+            // Bare URLs (not already inside an href)
+            html = html.replace(/(?<!="|'>)(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+            return `<p>${html}</p>`;
+        })
         .join('');
 }
 
