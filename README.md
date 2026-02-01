@@ -1,158 +1,151 @@
 # Mantis Music
 
-A self-hosted, Spotify-style artist discography player. Manage your music as simple files and folders, compile to JSON, and serve as a static site. Includes a browser-based admin UI, RSS feed generation, and a native macOS app.
+A self-hosted, Spotify-style discography player for independent artists. Manage your music as simple files and folders, edit metadata through a visual admin interface, and publish your own streaming site as a STATIC site (this means it works anywhere and is very secure and fast).
 
-## Demo 
+Designed for use on a Mac, but may work elsewhere.
 
-See a demo site by Mantis Audiogram at https://mantisaudiogram.music 
+**Demo:** [mantisaudiogram.music](https://mantisaudiogram.music)
 
-## Quickstart
+## Quick Start (macOS)
+
+**Prerequisites:** Python 3 and pip.
 
 ```bash
-# 1. Clone and enter the repo
+# 1. Clone the repo
 git clone <repo-url> && cd mantismusic
 
-# 2. Install Python dependencies
+# 2. Install dependencies and build the app
 pip install -r requirements.txt
-pip install flask       # for the admin UI
-pip install requests    # for streaming auto-link (optional)
-
-# 3. Add your music to the /music folder (see structure below)
-#    At minimum you need:
-#      music/artist/artist.md    — artist name, bio, social links
-#      music/tracks/my_song/     — one folder per track containing:
-#        track.md                — title, duration, tags, credits
-#        my_song.mp3             — the audio file
-
-# 4. Build the JSON database
-python3 build_music_json.py
-
-# 5. Preview the site
-python3 -m http.server 8000
-# Open http://localhost:8000
-
-# 6. Run the admin UI for editing metadata in a browser
-python3 admin.py
-# Open http://localhost:5001
+bash build_app.sh
 ```
 
+The build script creates **Mantis Music.app** and offers to copy it to `/Applications`. 
+
+**First launch:** The app asks you to choose a data directory for your music. Pick any folder — if it's empty, the app creates the full directory structure for you with a starter template. From there, everything is managed through the app's admin interface: add music, edit metadata, build, and deploy.
+
+You can edit the files and folders directly if you like, but it's easier through the app.
 
 ## How It Works
 
-1. You manage music as files and folders under `/music`
-2. `build_music_json.py` compiles everything into `data/discography.json`, generates an RSS feed (`feed.rss`), static feed pages (`feed/`), and a deploy-ready `data/index.html` with OpenGraph/Twitter meta tags
-3. The static frontend (`index.html` + `js/app.js` + `css/style.css`) loads the JSON and renders the player
-4. `admin.py` provides a browser-based editor for all metadata, with build and deploy buttons
+Mantis Music is a static site generator for music. Your source of truth is a folder of audio files and markdown metadata. A build step compiles that into a JSON database, and a vanilla JS frontend renders it as a player.
+
+1. **You organize music as files and folders** — MP3s, cover art, and `.md` files with metadata (title, tags, credits, streaming links, lyrics)
+2. **The build script compiles everything** into a JSON database, an RSS feed, and a deploy-ready `index.html` with social sharing tags
+3. **The frontend loads the JSON** and renders a full player with search, filtering, queuing, and streaming link integration
+4. **The admin UI** lets you edit all metadata visually, upload audio and images, and build/deploy with one click
+
+The macOS app wraps the admin UI in a native window — it's the easiest way to manage everything. But you can also run each piece directly from the command line (see [Running Without the App](#running-without-the-app)).
 
 ## Music Folder Structure
+
+This is what the app manages for you, but it's useful to understand since it's all just files:
 
 ```
 music/
 ├── artist/
-│   ├── artist.md                      # Artist name, bio, social links
-│   ├── profile.jpg                    # Square profile image (header, about, player, favicon)
-│   └── banner.png                     # Wide banner image (hero, background)
+│   ├── artist.md           # Artist name, bio, social links (YAML frontmatter + markdown body)
+│   ├── profile.jpg         # Square profile image (used as favicon, header, player art, OG image)
+│   └── banner.png          # Wide banner image (hero area and background texture)
 ├── tracks/
 │   └── song_name/
-│       ├── track.md                   # Track metadata (YAML frontmatter + description)
-│       ├── song_name.mp3              # Audio file (MP3 for streaming)
-│       ├── song_name.wav              # Lossless audio (optional, offered as download)
-│       ├── song_name.jpg              # Cover art (optional)
-│       └── song_name.txt              # Lyrics (optional, plain text)
+│       ├── track.md        # Title, duration, tags, credits, streaming URLs (YAML frontmatter + description)
+│       ├── song_name.mp3   # Audio file for streaming
+│       ├── song_name.wav   # Lossless version (optional — offered as download)
+│       ├── song_name.jpg   # Cover art (optional — optimized to 1024x1024 if oversized)
+│       └── song_name.txt   # Lyrics (optional — plain text)
 └── collections/
     └── album_name/
-        ├── collection.md              # Collection metadata + ordered track list
-        └── album_name.jpg             # Collection cover art
+        ├── collection.md   # Title, type (album/ep), ordered track list, streaming URLs
+        └── album_name.jpg  # Collection cover art
 ```
 
-### artist.md
+Collections reference tracks by their folder name. A track can belong to multiple collections, or none (shown as a standalone single).
 
+## Metadata Format
+
+All metadata lives in `.md` files with YAML frontmatter. The admin UI edits these for you, but you can also edit them directly.
+
+**artist.md:**
 ```yaml
 ---
 name: "Artist Name"
 spotify: "https://open.spotify.com/artist/..."
 apple_music: "https://music.apple.com/..."
-tidal: "https://tidal.com/artist/..."
-deezer: "https://www.deezer.com/artist/..."
-youtube: "https://www.youtube.com/..."
-soundcloud: "https://soundcloud.com/..."
 instagram: "https://www.instagram.com/..."
 website: "https://..."
 ---
-Bio text goes here. Blank lines create separate paragraphs.
+Bio text goes here. Supports **bold**, *italic*, [links](https://...), and paragraphs.
 ```
 
-### track.md
-
+**track.md:**
 ```yaml
 ---
 title: Song Title
 duration: '3:45'
 release_date: 2025-01-15
-bpm: 120
-key: Am
-mood:
-- Upbeat
-- Reflective
 tags:
 - Pop
 - Electronic
-- AI
 credits:
   Composer:
-  - Artist Name
-  Lyrics:
   - Artist Name
   Producer:
   - Artist Name
 spotify: https://open.spotify.com/track/...
 apple_music: https://music.apple.com/...
-tidal: https://tidal.com/track/...
-deezer: https://www.deezer.com/track/...
 ---
-Description text here. Blank lines create paragraphs.
+Description text here.
 ```
 
-Duration is auto-detected from MP3 files and written back to the frontmatter. Streaming URLs can also be auto-linked by the build script (see below).
-
-### collection.md
-
+**collection.md:**
 ```yaml
 ---
 title: Album Name
 type: album
 release_date: 2025-08-13
-tags:
-- Love Songs
-- Pop
 tracks:
 - track_slug_1
 - track_slug_2
 - track_slug_3
 spotify: https://open.spotify.com/album/...
-apple_music: https://music.apple.com/...
-tidal: https://tidal.com/album/...
-deezer: https://www.deezer.com/album/...
 ---
 Album description here.
 ```
 
-The `type` field can be `album` or `ep`. Collections reference tracks by their folder name (slug). A track can belong to multiple collections, or none (displayed as a standalone single).
+Duration is auto-detected from MP3 files. Streaming URLs can be auto-linked by the build script if you configure API credentials (see [Configuration](#configuration)).
+
+## The Admin UI
+
+The admin provides a browser-based interface for managing everything:
+
+- **Dashboard** — overview stats and health report (missing audio, cover art, streaming links)
+- **Track editor** — edit metadata, tags, credits, streaming URLs; upload audio and cover art; edit lyrics
+- **Collection editor** — edit metadata, reorder tracks with drag-and-drop, manage cover art
+- **Artist editor** — edit name, bio, social links, upload profile and banner images
+- **Settings** — configure site title, URL, deploy destination, Spotify API credentials
+- **Build & Deploy** — rebuild the site and push it to your server with one click
+
+## The Frontend
+
+A vanilla JavaScript single-page app. No framework, no build step.
+
+- Search across titles, descriptions, lyrics, and tags
+- Filter by tag and year
+- Track and collection detail views with lyrics, credits, and streaming links
+- Persistent audio player with queue, repeat modes, and progress seeking
+- Dynamic branding from your profile image (colors, favicon, header)
+- RSS feed with auto-discovery
 
 ## Configuration
 
-Copy the example config and edit it:
-
-```bash
-cp config.example.json config.json
-```
+The app creates a `config.json` in your data directory on first run. You can edit it via the admin Settings page or directly:
 
 ```json
 {
   "site_title": "My Artist Name",
   "site_url": "https://music.example.com",
-  "spotify_client_id": "your_spotify_client_id",
-  "spotify_client_secret": "your_spotify_client_secret",
+  "spotify_client_id": "",
+  "spotify_client_secret": "",
   "deploy": {
     "destination": "user@server.com:/var/www/music.example.com/"
   }
@@ -162,128 +155,140 @@ cp config.example.json config.json
 | Field | Purpose |
 |-------|---------|
 | `site_title` | Page title and OpenGraph title. Falls back to artist name if empty. |
-| `site_url` | Public URL. Used in RSS feed, OpenGraph tags, and feed page links. |
-| `spotify_client_id/secret` | For Spotify streaming auto-link. Get credentials at [developer.spotify.com](https://developer.spotify.com). |
+| `site_url` | Used in RSS feed, OpenGraph tags, and feed page links. |
+| `spotify_client_id/secret` | Enables Spotify streaming auto-link. Get credentials at [developer.spotify.com](https://developer.spotify.com). |
 | `deploy.destination` | rsync SSH target for deployment. |
 
 Tidal uses built-in catalog credentials. Deezer and Apple Music APIs are public and need no credentials.
 
-## Build Script
-
-`build_music_json.py` reads the `/music` folder structure and generates:
-
-- `data/discography.json` — the compiled music database
-- `data/index.html` — a copy of index.html with OpenGraph and Twitter Card meta tags injected
-- `data/og-image.jpg` — a copy of the artist profile image for social sharing
-- `feed.rss` — an RSS 2.0 feed with all tracks in chronological order
-- `feed/*.html` — static HTML pages for each track (linked from RSS items)
-
-Features:
-- **Streaming auto-link**: Searches Spotify, Apple Music, Tidal, and Deezer for missing URLs and writes them back into `.md` files
-- **Duration detection**: Reads MP3 duration via mutagen and updates `track.md` if needed
-- **Cover art detection**: Finds `.jpg`/`.png`/`.webp` images in each folder
-- **Audio detection**: Finds `.mp3`/`.wav`/`.m4a`/`.flac` files
-- **Duration calculation**: Totals track durations for collections
-
-## Frontend
-
-A vanilla JavaScript single-page application. No framework, no build step.
-
-- **Views**: Tracks (default), Collections, About
-- **Search**: Full-text search across titles, descriptions, lyrics, and tags
-- **Filters**: By tag and year, with a reset button
-- **Detail pages**: Track and collection detail views with lyrics, credits, streaming links, and playback controls
-- **Audio player**: Persistent bottom player bar with play/pause, prev/next, progress seek, volume, repeat modes, and queue management
-- **Branding**: Profile image as favicon and header avatar, banner as hero and subtle background texture, dynamic brand colors extracted from profile image
-- **RSS**: Auto-discovery link and RSS icon in navigation
-- **Streaming links**: SVG platform icons (Spotify, Apple Music, Tidal, Deezer, YouTube, etc.)
-
-## Admin UI
-
-`admin.py` is a Flask app for editing all metadata in a browser at `http://localhost:5001`.
-
-- **Dashboard**: Overview stats and health report (missing audio, cover art, streaming links, etc.)
-- **Track editor**: Edit metadata, tags, credits, streaming URLs; upload MP3 and WAV audio; upload cover art; edit lyrics; prev/next navigation between tracks
-- **Collection editor**: Edit metadata, reorder tracks with drag-and-drop, manage cover art
-- **Artist editor**: Edit name, bio, social links, upload profile and banner images
-- **Settings**: Configure site title, site URL, deploy destination, and Spotify API credentials
-- **Build button**: Run the build script from the browser and see output
-- **Deploy button**: Build and rsync the static site to your server with live progress
-
 ## Deployment
 
-The intended workflow: manage everything locally, then push the public site to a remote server.
+Deployment uses `rsync` over SSH to push your site to a remote server. Once set up, deploys happen with a single click in the admin UI — the build runs, then only changed files are synced.
 
-### Setup
+### Setting Up Your Web Server
 
-Set the `deploy.destination` in `config.json` (or in the admin Settings page) to an rsync SSH target:
+You need a Linux server (a cheap VPS from DigitalOcean, Hetzner, Linode, etc. works fine) with a web server like Nginx or Caddy.
+
+**1. Create a site directory on your server:**
+
+```bash
+ssh you@yourserver.com
+sudo mkdir -p /var/www/music.example.com
+sudo chown you:you /var/www/music.example.com
+```
+
+**2. Set up SSH key access** so deploys don't prompt for a password:
+
+```bash
+# On your Mac — generate a key if you don't have one
+ssh-keygen -t ed25519
+
+# Copy it to your server
+ssh-copy-id you@yourserver.com
+```
+
+Verify it works: `ssh you@yourserver.com` should log in without asking for a password.
+
+**3. Configure your web server** to serve the directory. For Nginx:
+
+```nginx
+server {
+    listen 80;
+    server_name music.example.com;
+    root /var/www/music.example.com;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+
+    # Cache audio files aggressively
+    location /music/ {
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+    }
+}
+```
+
+Then enable the site and set up HTTPS (Certbot makes this easy):
+
+```bash
+sudo ln -s /etc/nginx/sites-available/music.example.com /etc/nginx/sites-enabled/
+sudo certbot --nginx -d music.example.com
+sudo systemctl reload nginx
+```
+
+**4. Set the deploy destination** in the admin Settings page, or in `config.json`:
 
 ```json
 {
   "deploy": {
-    "destination": "user@yourserver.com:/var/www/music.example.com/"
+    "destination": "you@yourserver.com:/var/www/music.example.com/"
   }
 }
 ```
 
-Make sure you have SSH key access configured for the target server. The trailing slash on the destination matters for rsync.
+The trailing slash on the destination matters for rsync.
 
-### Workflow
+### Deploying
 
-1. Add or edit music locally (files in `/music`, or via the admin UI)
-2. Click **Build & Deploy** in the admin sidebar — this rebuilds the JSON, RSS feed, and OpenGraph metadata, then rsyncs to your server
+Click **Build & Deploy** in the admin sidebar. The build script runs first (compiling JSON, RSS, and OG tags), then rsync pushes only the changed files to your server. Subsequent deploys are fast since rsync transfers diffs.
 
-### What gets deployed
+Only public-facing files are deployed: the frontend, compiled data, audio files, images, and RSS feed. Source files (Python scripts, config, templates, markdown) are excluded automatically via `.deployignore`.
 
-Only the files needed to run the public site:
-- `index.html` — the frontend (build-generated version with OG tags)
-- `js/`, `css/` — frontend assets
-- `data/` — compiled database, OG image
-- `music/` — audio files, cover art, profile/banner images
-- `feed.rss`, `feed/` — RSS feed and per-track feed pages
+## Running Without the App
 
-Excluded automatically (via `.deployignore`): Python scripts, config files, templates, `.git`, and markdown metadata files.
-
-## macOS App
-
-A native macOS app wraps the admin UI in a standalone window. The app bundles all code; you only need to point it at a data directory containing your music files.
-
-### Building the app
+You don't need the macOS app. Everything works from the command line:
 
 ```bash
-pip install pyinstaller pywebview
-bash build_app.sh
+# Run the admin UI
+python3 admin.py                # http://localhost:5001
+
+# Or build and preview manually
+python3 build_music_json.py     # Compile music folder to JSON, RSS, OG tags
+python3 -m http.server 8000     # Preview at http://localhost:8000
 ```
 
-This creates `dist/Mantis Music.app` and offers to copy it to `/Applications`. Place an `icon.png` in the project root before building to use a custom app icon.
+## Build Script Details
 
-### First run
+`build_music_json.py` reads the `/music` folder and generates:
 
-On first launch, the app asks you to select a data directory. If you pick an empty folder, it creates the directory structure automatically (`music/`, `data/`, `feed/`, `config.json`, and a starter `artist.md`). On subsequent launches it remembers your choice.
+- `data/discography.json` — compiled music database
+- `data/discography.js` — same data as a JS global (for `file://` protocol support)
+- `data/index.html` — frontend with OpenGraph/Twitter meta tags injected
+- `data/og-image.jpg` — profile image copy for social sharing
+- `feed.rss` — RSS 2.0 feed
+- `feed/*.html` — per-track pages for RSS readers
+
+Additional features:
+- **Streaming auto-link** — searches Spotify, Apple Music, Tidal, and Deezer APIs for matching tracks and writes URLs back into `.md` files
+- **Duration detection** — reads MP3 duration and updates `track.md` automatically
+- **Image optimization** — shrinks oversized cover art to 1024x1024 using macOS `sips`, preserving originals as `raw-{filename}`
+- **Cache busting** — appends content hashes to JS/CSS/data references in `index.html`
 
 ## Project Files
 
 ```
 mantismusic/
 ├── index.html              # Frontend entry point
-├── js/app.js               # All frontend logic
-├── css/style.css           # All styles
+├── js/app.js               # Frontend logic (player, rendering, navigation)
+├── css/style.css           # Styles with CSS custom properties for theming
 ├── data/                   # Build output (generated)
-│   ├── discography.json    # Compiled music database
-│   ├── index.html          # Frontend with OG tags injected
-│   └── og-image.jpg        # Profile image copy for social sharing
 ├── music/                  # Source music files and metadata
 ├── feed.rss                # RSS feed (generated)
-├── feed/                   # Per-track HTML pages for RSS (generated)
-├── build_music_json.py     # Compiler: music folder → JSON + RSS + OG
-├── paths.py                # Central path resolution (APP_DIR vs DATA_DIR)
-├── admin.py                # Flask admin UI
+├── feed/                   # Per-track pages for RSS (generated)
+├── build_music_json.py     # Build script: music folder -> JSON + RSS + OG
+├── paths.py                # Path resolution (separates app code from user data)
+├── admin.py                # Flask admin UI (port 5001)
 ├── mantis_app.py           # Native macOS app wrapper (pywebview)
-├── build_app.sh            # Build script for macOS .app
-├── templates/              # Admin UI HTML templates (Jinja2)
-├── config.json             # Settings and API credentials (gitignored)
+├── build_app.sh            # Builds the macOS .app via PyInstaller
+├── templates/              # Admin UI templates (Jinja2)
 ├── config.example.json     # Settings template
 ├── requirements.txt        # Python dependencies
-├── .deployignore           # Files excluded from deploy rsync
+├── .deployignore           # Files excluded from deploy
 └── LICENSE                 # GPLv3
 ```
+
+## License
+
+GPLv3. See [LICENSE](LICENSE).
