@@ -176,7 +176,7 @@
             item.innerHTML = `
                 <span class="drag-handle">&#x2630;</span>
                 <span class="track-num">${idx + 1}</span>
-                <span class="track-title"><a href="/track/${slug}" style="color: inherit; text-decoration: none;" target="_blank">${escapeHtml(t.title)}</a></span>
+                <span class="track-title"><a href="/track/${slug}" style="color: inherit; text-decoration: none;">${escapeHtml(t.title)}</a></span>
                 <span class="track-duration">${t.duration || ''}</span>
                 <span class="status-icons">
                     <span class="status-dot ${t.has_audio ? 'ok' : 'missing'}" title="${t.has_audio ? 'Has audio' : 'No audio'}"></span>
