@@ -1,0 +1,13 @@
+*.py
+__pycache__
+.git
+.gitignore
+*.md
+config.json
+config.example.json
+templates
+node_modules
+package-lock.json
+screenshot.jpg
+.DS_Store
+.deployignore

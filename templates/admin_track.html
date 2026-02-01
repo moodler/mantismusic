@@ -92,9 +92,9 @@
                        value="{{ track.frontmatter.get('apple_music', '') if track else '' }}">
             </div>
             <div class="form-group">
-                <label>Bandcamp</label>
-                <input type="url" class="form-input" id="field-bandcamp"
-                       value="{{ track.frontmatter.get('bandcamp', '') if track else '' }}">
+                <label>Deezer</label>
+                <input type="url" class="form-input" id="field-deezer"
+                       value="{{ track.frontmatter.get('deezer', '') if track else '' }}">
             </div>
             <div class="form-group">
                 <label>Tidal</label>
@@ -236,7 +236,7 @@
             credits: getCredits(),
             spotify: document.getElementById('field-spotify').value,
             apple_music: document.getElementById('field-apple_music').value,
-            bandcamp: document.getElementById('field-bandcamp').value,
+            deezer: document.getElementById('field-deezer').value,
             tidal: document.getElementById('field-tidal').value,
         };
 

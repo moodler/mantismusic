@@ -123,6 +123,31 @@
             pointer-events: none;
         }
 
+        .deploy-btn {
+            width: 100%;
+            padding: 0.7rem;
+            border: 1px solid #7c6cd4;
+            background: transparent;
+            color: #7c6cd4;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+            font-family: inherit;
+            margin-top: 0.5rem;
+        }
+
+        .deploy-btn:hover {
+            background: #7c6cd4;
+            color: #000;
+        }
+
+        .deploy-btn.deploying {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
         /* Main content */
         .main {
             margin-left: var(--sidebar-width);
@@ -745,6 +770,7 @@
         </div>
         <div class="sidebar-footer">
             <button class="build-btn" onclick="runBuild()" id="build-btn">Build JSON</button>
+            <button class="deploy-btn" onclick="runDeploy()" id="deploy-btn">Deploy to Server</button>
         </div>
     </nav>
 
@@ -807,6 +833,38 @@
 
             btn.classList.remove('building');
             btn.textContent = 'Build JSON';
+        }
+
+        async function runDeploy() {
+            const btn = document.getElementById('deploy-btn');
+            const panel = document.getElementById('build-panel');
+            const output = document.getElementById('build-output');
+
+            btn.classList.add('deploying');
+            btn.textContent = 'Deploying...';
+
+            output.innerHTML = 'Deploying to server via rsync...\n';
+            panel.classList.add('open');
+
+            try {
+                const resp = await fetch('/api/deploy', { method: 'POST' });
+                const data = await resp.json();
+
+                let html = '';
+                if (data.stdout) html += escapeHtml(data.stdout);
+                if (data.stderr) html += '\n' + escapeHtml(data.stderr);
+                if (data.ok) html += '\n<span class="success">Deploy completed successfully.</span>';
+                else html += '\n<span class="error">Deploy failed (exit code ' + data.returncode + ')</span>';
+
+                output.innerHTML = html;
+                showToast(data.ok ? 'Deploy successful' : 'Deploy failed', data.ok ? 'success' : 'error');
+            } catch (e) {
+                output.innerHTML = `<span class="error">Error: ${e.message}</span>`;
+                showToast('Deploy error', 'error');
+            }
+
+            btn.classList.remove('deploying');
+            btn.textContent = 'Deploy to Server';
         }
 
         function closeBuildPanel() {

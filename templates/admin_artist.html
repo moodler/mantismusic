@@ -50,9 +50,14 @@
                    value="{{ frontmatter.get('website', '') }}">
         </div>
         <div class="form-group">
-            <label>Bandcamp</label>
-            <input type="url" class="form-input" id="field-bandcamp"
-                   value="{{ frontmatter.get('bandcamp', '') }}">
+            <label>Tidal</label>
+            <input type="url" class="form-input" id="field-tidal"
+                   value="{{ frontmatter.get('tidal', '') }}">
+        </div>
+        <div class="form-group">
+            <label>Deezer</label>
+            <input type="url" class="form-input" id="field-deezer"
+                   value="{{ frontmatter.get('deezer', '') }}">
         </div>
         <div class="form-group">
             <label>SoundCloud</label>
@@ -78,7 +83,8 @@
             apple_music: document.getElementById('field-apple_music').value,
             youtube: document.getElementById('field-youtube').value,
             website: document.getElementById('field-website').value,
-            bandcamp: document.getElementById('field-bandcamp').value,
+            tidal: document.getElementById('field-tidal').value,
+            deezer: document.getElementById('field-deezer').value,
             soundcloud: document.getElementById('field-soundcloud').value,
             instagram: document.getElementById('field-instagram').value,
         };

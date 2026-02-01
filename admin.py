@@ -376,7 +376,7 @@ def save_track(slug):
         fm['credits'] = data['credits']
 
     # Streaming links
-    for platform in ['spotify', 'apple_music', 'bandcamp', 'tidal']:
+    for platform in ['spotify', 'apple_music', 'tidal', 'deezer']:
         if data.get(platform):
             fm[platform] = data[platform]
 
@@ -466,7 +466,7 @@ def save_collection(slug):
     if data.get('tracks'):
         fm['tracks'] = data['tracks']
 
-    for platform in ['spotify', 'apple_music', 'bandcamp', 'tidal']:
+    for platform in ['spotify', 'apple_music', 'tidal', 'deezer']:
         if data.get(platform):
             fm[platform] = data[platform]
 
@@ -541,8 +541,8 @@ def save_artist():
     fm = {}
     if data.get('name'):
         fm['name'] = data['name']
-    for field in ['spotify', 'apple_music', 'youtube', 'website',
-                  'bandcamp', 'soundcloud', 'instagram']:
+    for field in ['spotify', 'apple_music', 'tidal', 'deezer',
+                  'youtube', 'website', 'soundcloud', 'instagram']:
         if data.get(field):
             fm[field] = data[field]
 
@@ -566,6 +566,59 @@ def run_build():
     except subprocess.TimeoutExpired:
         return jsonify(ok=False, stdout='', stderr='Build timed out after 30s',
                        returncode=-1)
+
+
+@app.route('/api/deploy', methods=['POST'])
+def run_deploy():
+    config_path = BASE_DIR / 'config.json'
+    if not config_path.exists():
+        return jsonify(ok=False, stdout='', stderr='config.json not found',
+                       returncode=-1)
+
+    try:
+        config = json.loads(config_path.read_text())
+    except Exception as e:
+        return jsonify(ok=False, stdout='', stderr=f'Invalid config.json: {e}',
+                       returncode=-1)
+    deploy = config.get('deploy', {})
+    destination = deploy.get('destination', '')
+
+    if not destination or destination == 'user@server.com:/var/www/music.example.com/':
+        return jsonify(ok=False, stdout='',
+                       stderr='Deploy destination not configured.\n\nAdd to config.json:\n  "deploy": {\n    "destination": "user@host:/path/to/site/"\n  }',
+                       returncode=-1)
+
+    deployignore = BASE_DIR / '.deployignore'
+    cmd = [
+        'rsync', '-avz', '--delete',
+        '-e', 'ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes',
+    ]
+    if deployignore.exists():
+        cmd += ['--exclude-from', str(deployignore)]
+    cmd += [
+        str(BASE_DIR / 'index.html'),
+        str(BASE_DIR / 'js'),
+        str(BASE_DIR / 'css'),
+        str(BASE_DIR / 'data'),
+        str(BASE_DIR / 'music'),
+        destination
+    ]
+
+    try:
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, cwd=str(BASE_DIR), timeout=120
+        )
+        return jsonify(
+            ok=result.returncode == 0,
+            stdout=result.stdout,
+            stderr=result.stderr,
+            returncode=result.returncode
+        )
+    except subprocess.TimeoutExpired:
+        return jsonify(ok=False, stdout='', stderr='Deploy timed out after 120s',
+                       returncode=-1)
+    except Exception as e:
+        return jsonify(ok=False, stdout='', stderr=str(e), returncode=-1)
 
 
 @app.route('/api/health')
