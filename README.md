@@ -2,6 +2,10 @@
 
 A self-hosted, Spotify-style artist discography player. Manage your music as simple files and folders, compile to JSON, and serve as a static site. Includes a browser-based admin UI, RSS feed generation, and a native macOS app.
 
+## Demo 
+
+See my site at https://mantisaudiogram.music 
+
 ## Quickstart
 
 ```bash
