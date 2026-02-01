@@ -40,9 +40,10 @@ Mantis Music is a static, self-hosted, Spotify-style artist discography web appl
 
 ```
 music/
-├── artist.md               # YAML frontmatter: name, social links. Body: bio text
-├── profile.jpg             # Square profile image
-├── banner.png              # Wide banner image
+├── artist/
+│   ├── artist.md           # YAML frontmatter: name, social links. Body: bio text
+│   ├── profile.jpg         # Square profile image
+│   └── banner.png          # Wide banner image
 ├── tracks/
 │   └── song_name/
 │       ├── track.md        # YAML frontmatter: title, duration, tags, credits, streaming URLs. Body: description

@@ -1,4 +1,21 @@
 #!/usr/bin/env python3
+#
+# Mantis Music - A self-hosted artist discography player
+# Copyright (C) 2026 Martin Dougiamas
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+#
 """
 build_music_json.py - The Compiler
 
@@ -7,7 +24,10 @@ for the web application.
 
 Structure:
   music/
-  ├── artist.md
+  ├── artist/
+  │   ├── artist.md
+  │   ├── profile.jpg
+  │   └── banner.png
   ├── tracks/           # All songs (flat structure)
   │   ├── song_name/
   │   │   ├── track.md
@@ -155,7 +175,7 @@ def build_asset_path(local_path, asset_type):
 
 def parse_artist():
     """Parse artist.md and return artist data."""
-    artist_md = MUSIC_DIR / "artist.md"
+    artist_md = MUSIC_DIR / "artist" / "artist.md"
     frontmatter, bio = read_md_file(artist_md)
 
     social_links = {}
@@ -574,7 +594,7 @@ def load_all_tracks(spotify_token=None, tidal_token=None):
                 bpm = None
 
         tracks[track_slug] = {
-            'slug': track_slug,
+            'slug': track_slug.replace('_', '-'),
             'title': frontmatter.get('title', track_slug.replace('_', ' ').title()),
             'duration': str(frontmatter.get('duration', '')),
             'bpm': bpm,
@@ -692,7 +712,7 @@ def parse_release(release_dir, all_tracks):
             track_data = all_tracks[track_ref].copy()
             track_data['trackNumber'] = idx
             # Remove single-specific fields from track when part of collection
-            for field in ['slug', 'releaseDate', 'year']:
+            for field in ['releaseDate', 'year']:
                 track_data.pop(field, None)
             # Use track's own cover if available, otherwise release cover
             if not track_data.get('coverArt'):

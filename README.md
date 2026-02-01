@@ -15,7 +15,7 @@ cp config.example.json config.json
 
 # 3. Add your music to the /music folder (see structure below)
 #    At minimum you need:
-#      music/artist.md          — artist name, bio, social links
+#      music/artist/artist.md    — artist name, bio, social links
 #      music/tracks/my_song/    — one folder per track containing:
 #        track.md               — title, duration, tags, credits, streaming URLs
 #        my_song.mp3            — the audio file
@@ -47,9 +47,10 @@ python3 admin.py
 
 ```
 music/
-├── artist.md                          # Artist name, bio, social links
-├── profile.jpg                        # Square profile image (used in header, about, player)
-├── banner.png                         # Wide banner image (used in hero, background)
+├── artist/
+│   ├── artist.md                      # Artist name, bio, social links
+│   ├── profile.jpg                    # Square profile image (used in header, about, player)
+│   └── banner.png                     # Wide banner image (used in hero, background)
 ├── tracks/
 │   └── song_name/
 │       ├── track.md                   # Track metadata (YAML frontmatter + description)
@@ -130,7 +131,7 @@ Collections reference tracks by their folder name (slug). A track can belong to 
 
 ## Build Script
 
-`build_music_json.py` reads every `track.md`, `collection.md`, and `artist.md` under `/music` and compiles them into `data/discography.json`.
+`build_music_json.py` reads `artist/artist.md`, every `track.md`, and `collection.md` under `/music` and compiles them into `data/discography.json`.
 
 Features:
 - **Streaming auto-link**: If a track or collection is missing Spotify, Apple Music, Tidal, or Deezer URLs, the script searches those platforms automatically and writes the URLs back into the `.md` files

@@ -1,4 +1,21 @@
 #!/usr/bin/env python3
+#
+# Mantis Music - A self-hosted artist discography player
+# Copyright (C) 2026 Martin Dougiamas
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+#
 """
 admin.py - Local Flask admin UI for managing music metadata.
 
@@ -13,10 +30,11 @@ Usage:
 import base64
 import json
 import os
+import re
 import subprocess
 import yaml
 from pathlib import Path
-from flask import Flask, render_template, request, jsonify, send_from_directory
+from flask import Flask, render_template, request, jsonify, send_from_directory, Response
 
 app = Flask(__name__)
 
@@ -24,6 +42,7 @@ BASE_DIR = Path(__file__).parent
 MUSIC_DIR = BASE_DIR / "music"
 TRACKS_DIR = MUSIC_DIR / "tracks"
 COLLECTIONS_DIR = MUSIC_DIR / "collections"
+ARTIST_DIR = MUSIC_DIR / "artist"
 
 IMAGE_EXTS = ('.jpg', '.jpeg', '.png', '.gif', '.webp')
 AUDIO_EXTS = ('.mp3', '.m4a', '.flac', '.wav')
@@ -218,6 +237,23 @@ def remove_cover_images(directory):
                 f.unlink()
 
 
+def find_image_by_prefix(directory, prefix):
+    """Find an image file matching a name prefix (e.g. 'profile' finds profile.jpg)."""
+    for ext in IMAGE_EXTS:
+        path = directory / f"{prefix}{ext}"
+        if path.exists():
+            return path
+    return None
+
+
+def remove_images_by_prefix(directory, prefix):
+    """Remove all image files matching a name prefix."""
+    for ext in IMAGE_EXTS:
+        path = directory / f"{prefix}{ext}"
+        if path.exists():
+            path.unlink()
+
+
 def capitalize_tags(tags):
     return [t[:1].upper() + t[1:] if t else t for t in tags]
 
@@ -336,8 +372,12 @@ def edit_collection(slug):
 
 @app.route('/artist')
 def edit_artist():
-    fm, body = read_md_file(MUSIC_DIR / 'artist.md')
-    return render_template('admin_artist.html', frontmatter=fm, bio=body)
+    fm, body = read_md_file(ARTIST_DIR / 'artist.md')
+    profile_img = find_image_by_prefix(ARTIST_DIR, 'profile')
+    banner_img = find_image_by_prefix(ARTIST_DIR, 'banner')
+    return render_template('admin_artist.html', frontmatter=fm, bio=body,
+                           profile_url=f'/music/artist/{profile_img.name}' if profile_img else None,
+                           banner_url=f'/music/artist/{banner_img.name}' if banner_img else None)
 
 
 # ---------------------------------------------------------------------------
@@ -546,8 +586,50 @@ def save_artist():
         if data.get(field):
             fm[field] = data[field]
 
-    write_md_file(MUSIC_DIR / 'artist.md', fm, bio)
+    write_md_file(ARTIST_DIR / 'artist.md', fm, bio)
     return jsonify(ok=True)
+
+
+@app.route('/api/artist/profile', methods=['POST'])
+def upload_artist_profile():
+    remove_images_by_prefix(ARTIST_DIR, 'profile')
+
+    if 'file' in request.files:
+        file = request.files['file']
+        ext = Path(file.filename).suffix or '.jpg'
+        dest = ARTIST_DIR / f"profile{ext}"
+        file.save(str(dest))
+    elif request.is_json and request.json.get('dataUrl'):
+        data_url = request.json['dataUrl']
+        header, data = data_url.split(',', 1)
+        ext = '.png' if 'png' in header else '.jpg'
+        dest = ARTIST_DIR / f"profile{ext}"
+        dest.write_bytes(base64.b64decode(data))
+    else:
+        return jsonify(error="No image provided"), 400
+
+    return jsonify(ok=True, url=f'/music/artist/{dest.name}')
+
+
+@app.route('/api/artist/banner', methods=['POST'])
+def upload_artist_banner():
+    remove_images_by_prefix(ARTIST_DIR, 'banner')
+
+    if 'file' in request.files:
+        file = request.files['file']
+        ext = Path(file.filename).suffix or '.jpg'
+        dest = ARTIST_DIR / f"banner{ext}"
+        file.save(str(dest))
+    elif request.is_json and request.json.get('dataUrl'):
+        data_url = request.json['dataUrl']
+        header, data = data_url.split(',', 1)
+        ext = '.png' if 'png' in header else '.jpg'
+        dest = ARTIST_DIR / f"banner{ext}"
+        dest.write_bytes(base64.b64decode(data))
+    else:
+        return jsonify(error="No image provided"), 400
+
+    return jsonify(ok=True, url=f'/music/artist/{dest.name}')
 
 
 @app.route('/api/build', methods=['POST'])
@@ -572,25 +654,23 @@ def run_build():
 def run_deploy():
     config_path = BASE_DIR / 'config.json'
     if not config_path.exists():
-        return jsonify(ok=False, stdout='', stderr='config.json not found',
-                       returncode=-1)
+        return jsonify(ok=False, stderr='config.json not found', returncode=-1)
 
     try:
         config = json.loads(config_path.read_text())
     except Exception as e:
-        return jsonify(ok=False, stdout='', stderr=f'Invalid config.json: {e}',
-                       returncode=-1)
+        return jsonify(ok=False, stderr=f'Invalid config.json: {e}', returncode=-1)
     deploy = config.get('deploy', {})
     destination = deploy.get('destination', '')
 
     if not destination or destination == 'user@server.com:/var/www/music.example.com/':
-        return jsonify(ok=False, stdout='',
+        return jsonify(ok=False,
                        stderr='Deploy destination not configured.\n\nAdd to config.json:\n  "deploy": {\n    "destination": "user@host:/path/to/site/"\n  }',
                        returncode=-1)
 
     deployignore = BASE_DIR / '.deployignore'
     cmd = [
-        'rsync', '-avz', '--delete',
+        'rsync', '-avz', '--delete', '--progress',
         '-e', 'ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes',
     ]
     if deployignore.exists():
@@ -604,21 +684,42 @@ def run_deploy():
         destination
     ]
 
-    try:
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, cwd=str(BASE_DIR), timeout=120
-        )
-        return jsonify(
-            ok=result.returncode == 0,
-            stdout=result.stdout,
-            stderr=result.stderr,
-            returncode=result.returncode
-        )
-    except subprocess.TimeoutExpired:
-        return jsonify(ok=False, stdout='', stderr='Deploy timed out after 120s',
-                       returncode=-1)
-    except Exception as e:
-        return jsonify(ok=False, stdout='', stderr=str(e), returncode=-1)
+    # Pattern to match rsync xfer progress: (xfer#N, to-check=M/T)
+    xfer_re = re.compile(r'\(xfer#(\d+),\s*to-check=(\d+)/(\d+)\)')
+
+    def stream():
+        try:
+            proc = subprocess.Popen(
+                cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                text=True, cwd=str(BASE_DIR)
+            )
+            files_done = 0
+            total_files = 0
+            current_file = None
+            for line in iter(proc.stdout.readline, ''):
+                line = line.rstrip()
+                # Match transfer completion lines with xfer info
+                m = xfer_re.search(line)
+                if m:
+                    files_done = int(m.group(1))
+                    remaining = int(m.group(2))
+                    total_files = int(m.group(3))
+                    pct = round((total_files - remaining) / total_files * 100) if total_files else 0
+                    yield f"data: {json.dumps({'xfer': files_done, 'total': total_files, 'pct': pct, 'file': current_file})}\n\n"
+                # Skip partial progress lines (start with whitespace + numbers)
+                elif line and not line[0].isspace():
+                    # This is a filename or directory or status line
+                    current_file = line
+                    yield f"data: {json.dumps({'line': line})}\n\n"
+            proc.stdout.close()
+            stderr = proc.stderr.read()
+            proc.stderr.close()
+            rc = proc.wait()
+            yield f"data: {json.dumps({'done': True, 'ok': rc == 0, 'returncode': rc, 'stderr': stderr, 'files': files_done})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'done': True, 'ok': False, 'returncode': -1, 'stderr': str(e)})}\n\n"
+
+    return Response(stream(), mimetype='text/event-stream')
 
 
 @app.route('/api/health')

@@ -1,3 +1,20 @@
+<!--
+  Mantis Music - A self-hosted artist discography player
+  Copyright (C) 2026 Martin Dougiamas
+
+  This program is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with this program. If not, see <https://www.gnu.org/licenses/>.
+-->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -843,23 +860,68 @@
             btn.classList.add('deploying');
             btn.textContent = 'Deploying...';
 
-            output.innerHTML = 'Deploying to server via rsync...\n';
+            output.innerHTML = '<div id="deploy-progress-bar" style="background:#333;border-radius:4px;height:20px;margin-bottom:8px;overflow:hidden;display:none"><div id="deploy-progress-fill" style="background:#7c6cd4;height:100%;width:0%;transition:width 0.3s;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;min-width:40px"></div></div><div id="deploy-log"></div>';
             panel.classList.add('open');
+
+            const progressBar = document.getElementById('deploy-progress-bar');
+            const progressFill = document.getElementById('deploy-progress-fill');
+            const log = document.getElementById('deploy-log');
 
             try {
                 const resp = await fetch('/api/deploy', { method: 'POST' });
-                const data = await resp.json();
+                const contentType = resp.headers.get('content-type') || '';
 
-                let html = '';
-                if (data.stdout) html += escapeHtml(data.stdout);
-                if (data.stderr) html += '\n' + escapeHtml(data.stderr);
-                if (data.ok) html += '\n<span class="success">Deploy completed successfully.</span>';
-                else html += '\n<span class="error">Deploy failed (exit code ' + data.returncode + ')</span>';
+                if (contentType.includes('text/event-stream')) {
+                    const reader = resp.body.getReader();
+                    const decoder = new TextDecoder();
+                    let buffer = '';
 
-                output.innerHTML = html;
-                showToast(data.ok ? 'Deploy successful' : 'Deploy failed', data.ok ? 'success' : 'error');
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        buffer += decoder.decode(value, { stream: true });
+
+                        let boundary;
+                        while ((boundary = buffer.indexOf('\n\n')) !== -1) {
+                            const chunk = buffer.slice(0, boundary);
+                            buffer = buffer.slice(boundary + 2);
+
+                            if (!chunk.startsWith('data: ')) continue;
+                            const data = JSON.parse(chunk.slice(6));
+
+                            if (data.xfer !== undefined) {
+                                progressBar.style.display = 'block';
+                                progressFill.style.width = data.pct + '%';
+                                progressFill.textContent = data.pct + '%';
+                                btn.textContent = `Deploying... ${data.xfer}/${data.total} files (${data.pct}%)`;
+                                if (data.file) {
+                                    log.textContent += data.file + '\n';
+                                    log.scrollTop = log.scrollHeight;
+                                }
+                            } else if (data.line !== undefined) {
+                                log.textContent += data.line + '\n';
+                                log.scrollTop = log.scrollHeight;
+                            }
+                            if (data.done) {
+                                progressFill.style.width = '100%';
+                                progressFill.textContent = '100%';
+                                if (data.stderr) log.innerHTML += '<span class="error">' + escapeHtml(data.stderr) + '</span>\n';
+                                if (data.ok) log.innerHTML += '<span class="success">Deploy completed. ' + (data.files || 0) + ' files transferred.</span>\n';
+                                else log.innerHTML += '<span class="error">Deploy failed (exit code ' + data.returncode + ')</span>\n';
+                                log.scrollTop = log.scrollHeight;
+                                showToast(data.ok ? 'Deploy successful' : 'Deploy failed', data.ok ? 'success' : 'error');
+                            }
+                        }
+                    }
+                } else {
+                    const data = await resp.json();
+                    let html = '';
+                    if (data.stderr) html += '<span class="error">' + escapeHtml(data.stderr) + '</span>';
+                    log.innerHTML = html;
+                    showToast('Deploy failed', 'error');
+                }
             } catch (e) {
-                output.innerHTML = `<span class="error">Error: ${e.message}</span>`;
+                output.innerHTML += `<span class="error">Error: ${e.message}</span>`;
                 showToast('Deploy error', 'error');
             }
 

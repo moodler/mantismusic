@@ -1,3 +1,4 @@
+{# Mantis Music - Copyright (C) 2026 Martin Dougiamas - GPL v3 #}
 {% extends "admin_base.html" %}
 {% block title %}Artist{% endblock %}
 
@@ -14,6 +15,26 @@
 
 <div class="page-content">
     <div style="max-width: 640px;">
+        <div class="form-group">
+            <label>Profile Image</label>
+            <div class="cover-zone" id="profile-zone"
+                 style="width: 200px; height: 200px; border-radius: 50%; overflow: hidden;
+                        {% if profile_url %}background-image: url('{{ profile_url }}?t={{ range(100000) | random }}'); background-size: cover; background-position: center;{% endif %}">
+                {% if not profile_url %}<span class="cover-placeholder">Click, paste, or drag to upload profile image</span>{% endif %}
+            </div>
+            <input type="file" id="profile-file" accept="image/*" style="display:none">
+        </div>
+
+        <div class="form-group">
+            <label>Banner Image</label>
+            <div class="cover-zone" id="banner-zone"
+                 style="width: 100%; height: 180px; border-radius: 8px; overflow: hidden;
+                        {% if banner_url %}background-image: url('{{ banner_url }}?t={{ range(100000) | random }}'); background-size: cover; background-position: center;{% endif %}">
+                {% if not banner_url %}<span class="cover-placeholder">Click, paste, or drag to upload banner image</span>{% endif %}
+            </div>
+            <input type="file" id="banner-file" accept="image/*" style="display:none">
+        </div>
+
         <div class="form-group">
             <label>Name</label>
             <input type="text" class="form-input" id="field-name"
@@ -75,6 +96,11 @@
 
 {% block scripts %}
 <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        initCoverZone('profile-zone', 'profile-file', '/api/artist/profile');
+        initCoverZone('banner-zone', 'banner-file', '/api/artist/banner');
+    });
+
     async function saveArtist() {
         const data = {
             name: document.getElementById('field-name').value,

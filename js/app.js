@@ -1,3 +1,21 @@
+/*
+ * Mantis Music - A self-hosted artist discography player
+ * Copyright (C) 2026 Martin Dougiamas
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
 // Streaming platform SVG icons
 const PLATFORM_ICONS = {
     spotify: '<svg viewBox="0 0 24 24"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.6 0 12 0zm5.52 17.28c-.24.36-.66.48-1.02.24-2.82-1.74-6.36-2.1-10.56-1.14-.42.12-.78-.18-.9-.54-.12-.42.18-.78.54-.9 4.56-1.02 8.52-.6 11.7 1.32.36.22.48.66.24 1.02zm1.44-3.3c-.3.42-.84.6-1.26.3-3.24-1.98-8.16-2.58-11.94-1.38-.48.12-.99-.12-1.14-.6-.12-.48.12-.99.6-1.14 4.38-1.32 9.78-.66 13.5 1.62.36.18.54.78.24 1.2zm.12-3.36C15.24 8.4 8.88 8.16 5.16 9.3c-.6.18-1.2-.18-1.38-.78-.18-.6.18-1.2.78-1.38 4.26-1.26 11.28-1.02 15.72 1.62.54.3.72 1.02.42 1.56-.3.42-1.02.6-1.56.3z"/></svg>',
@@ -97,6 +115,21 @@ function findReleaseById(id) {
         || null;
 }
 
+// Find a track by slug across all releases; returns { track, release } or null
+function findTrackBySlug(slug) {
+    if (!discographyData) return null;
+    // Check singles first (their id IS the slug)
+    const single = discographyData.singles.find(s => s.id === slug);
+    if (single) return { track: single, release: single };
+    // Check tracks within albums
+    for (const album of discographyData.albums) {
+        if (!album.tracks) continue;
+        const track = album.tracks.find(t => t.slug === slug);
+        if (track) return { track, release: album };
+    }
+    return null;
+}
+
 // Read the current hash and navigate to the matching view
 function navigateFromHash() {
     const hash = window.location.hash.replace(/^#\/?/, ''); // strip leading #/ or #
@@ -126,7 +159,7 @@ function navigateFromHash() {
         navigationHistory = [];
         syncNavButton();
         renderView();
-    } else if (parts[0] === 'release' && parts[1]) {
+    } else if ((parts[0] === 'collection' || parts[0] === 'release') && parts[1]) {
         const release = findReleaseById(parts[1]);
         if (release) {
             navigationHistory = [{ type: 'list' }];
@@ -136,25 +169,14 @@ function navigateFromHash() {
             renderView();
         }
     } else if (parts[0] === 'track' && parts[1]) {
-        const release = findReleaseById(parts[1]);
-        if (release) {
-            if (parts[2]) {
-                // Track within a collection — index is 1-based
-                const trackIndex = parseInt(parts[2], 10) - 1;
-                const track = release.tracks?.[trackIndex];
-                if (track) {
-                    navigationHistory = [{ type: 'list' }, { type: 'release', release }];
-                    syncNavButton();
-                    showTrackDetail(track, release);
-                } else {
-                    renderView();
-                }
-            } else {
-                // Single track (no track number)
-                navigationHistory = [{ type: 'list' }];
-                syncNavButton();
-                showTrackDetail(release, release);
-            }
+        const result = findTrackBySlug(parts[1]);
+        if (result) {
+            const isSingle = result.track === result.release;
+            navigationHistory = isSingle
+                ? [{ type: 'list' }]
+                : [{ type: 'list' }, { type: 'release', release: result.release }];
+            syncNavButton();
+            showTrackDetail(result.track, result.release);
         } else {
             renderView();
         }
@@ -653,7 +675,7 @@ function updatePlayerUI() {
         playerCover.style.backgroundPosition = 'center';
         playerCover.textContent = '';
     } else {
-        playerCover.style.backgroundImage = 'url(music/profile.jpg)';
+        playerCover.style.backgroundImage = 'url(music/artist/profile.jpg)';
         playerCover.style.backgroundSize = 'cover';
         playerCover.style.backgroundPosition = 'center';
         playerCover.textContent = '';
@@ -779,7 +801,7 @@ function applyBrandColors() {
             el.style.backgroundClip = 'text';
         });
     };
-    img.src = 'music/profile.jpg';
+    img.src = 'music/artist/profile.jpg';
 }
 
 // Extract dominant color from an image and apply gradient to an element
@@ -1156,12 +1178,12 @@ function renderAbout() {
     if (!document.querySelector('.about-banner')) {
         const banner = document.createElement('div');
         banner.className = 'about-banner';
-        banner.style.backgroundImage = 'url(music/banner.png)';
+        banner.style.backgroundImage = 'url(music/artist/banner.png)';
         aboutContent.insertBefore(banner, aboutContent.firstChild);
 
         const profile = document.createElement('img');
         profile.className = 'about-profile';
-        profile.src = 'music/profile.jpg';
+        profile.src = 'music/artist/profile.jpg';
         profile.alt = 'Mantis Audiogram';
         banner.insertAdjacentElement('afterend', profile);
     }
@@ -1404,7 +1426,7 @@ function createTrackCard(track, release) {
 function showReleaseDetail(release) {
     hideAllSections();
     currentDetailRelease = release;
-    updateHash(`#/release/${release.id}`);
+    updateHash(`#/collection/${release.id}`);
 
     // Set cover
     const cover = document.getElementById('detail-cover');
@@ -1644,14 +1666,9 @@ function openReleaseModal(release) {
 function showTrackDetail(track, release) {
     hideAllSections();
 
-    // Set hash: singles use #/track/{id}, collection tracks use #/track/{id}/{1-based-index}
-    const isSingleRelease = !release.tracks;
-    if (isSingleRelease) {
-        updateHash(`#/track/${release.id}`);
-    } else {
-        const trackIndex = release.tracks.indexOf(track) + 1;
-        updateHash(`#/track/${release.id}/${trackIndex}`);
-    }
+    // Set hash: use track slug for all tracks
+    const trackSlug = track.slug || release.id;
+    updateHash(`#/track/${trackSlug}`);
 
     // Set cover (use track cover if available, otherwise release cover)
     const cover = document.getElementById('track-detail-cover');

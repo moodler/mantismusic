@@ -1,3 +1,20 @@
+<!--
+  Mantis Music - A self-hosted artist discography player
+  Copyright (C) 2026 Martin Dougiamas
+
+  This program is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with this program. If not, see <https://www.gnu.org/licenses/>.
+-->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -15,7 +32,7 @@
         <div class="container">
             <div class="header-content">
                 <div class="logo-group" style="cursor:pointer" onclick="currentView='tracks';navigationHistory=[];document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.view==='tracks'));renderView();">
-                    <img src="music/profile.jpg" alt="Mantis Audiogram" class="header-avatar">
+                    <img src="music/artist/profile.jpg" alt="Mantis Audiogram" class="header-avatar">
                     <h1 class="logo">Mantis Audiogram</h1>
                 </div>
                 <nav class="nav">
