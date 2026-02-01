@@ -59,16 +59,16 @@ from html import escape
 from xml.sax.saxutils import escape as xml_escape
 
 
-BASE_DIR = Path(__file__).parent
-MUSIC_DIR = BASE_DIR / "music"
-TRACKS_DIR = MUSIC_DIR / "tracks"
-COLLECTIONS_DIR = MUSIC_DIR / "collections"
-OUTPUT_PATH = BASE_DIR / "data" / "discography.json"
-RSS_PATH = BASE_DIR / "feed.rss"
-FEED_PAGES_DIR = BASE_DIR / "feed"
+from paths import (APP_DIR, DATA_DIR, MUSIC_DIR, TRACKS_DIR, COLLECTIONS_DIR,
+                    ARTIST_DIR, INDEX_HTML, OUTPUT_PATH, RSS_PATH,
+                    FEED_PAGES_DIR, CONFIG_PATH, DATA_OUTPUT_DIR)
+
+# BASE_DIR is used for relative asset path computation in build_asset_path()
+BASE_DIR = DATA_DIR
 
 BASE_URL = ""
 SITE_URL = ""
+SITE_TITLE = ""
 
 
 def parse_frontmatter(content):
@@ -223,7 +223,7 @@ def _titles_match(search_title, result_title):
 def load_config():
     """Load config from config.json, falling back to env vars."""
     config = {}
-    config_path = BASE_DIR / 'config.json'
+    config_path = CONFIG_PATH
     if config_path.exists():
         try:
             config = json.loads(config_path.read_text(encoding='utf-8'))
@@ -912,8 +912,73 @@ pre {{ white-space: pre-wrap; color: #ccc; line-height: 1.6; }}
     print(f"  Feed pages: {FEED_PAGES_DIR}/ ({len(feed_items)} pages)")
 
 
+def generate_index_html(discography):
+    """Generate data/index.html with OpenGraph meta tags and favicon."""
+    import shutil
+
+    artist = discography['artist']
+    title = SITE_TITLE or artist
+    bio = discography.get('bio', '')
+    # Truncate bio for OG description
+    og_desc = bio[:200].replace('\n', ' ').strip()
+    if len(bio) > 200:
+        og_desc += '...'
+
+    # Copy artist profile image to data/og-image.jpg for a stable OG image URL
+    profile_img = find_file(ARTIST_DIR, ['.jpg', '.jpeg', '.png', '.gif', '.webp'])
+    og_image_path = ''
+    og_image_url = ''
+    if profile_img:
+        ext = profile_img.suffix
+        dest = DATA_OUTPUT_DIR / f"og-image{ext}"
+        shutil.copy2(str(profile_img), str(dest))
+        og_image_path = f"data/og-image{ext}"
+        if SITE_URL:
+            og_image_url = f"{SITE_URL}/{og_image_path}"
+
+    # Read source index.html
+    source_html = INDEX_HTML.read_text(encoding='utf-8')
+
+    # Build OG meta tags
+    og_tags = []
+    og_tags.append(f'    <meta property="og:type" content="website">')
+    og_tags.append(f'    <meta property="og:title" content="{escape(title)}">')
+    if og_desc:
+        og_tags.append(f'    <meta property="og:description" content="{escape(og_desc)}">')
+    if SITE_URL:
+        og_tags.append(f'    <meta property="og:url" content="{escape(SITE_URL)}">')
+    if og_image_url:
+        og_tags.append(f'    <meta property="og:image" content="{escape(og_image_url)}">')
+        og_tags.append(f'    <meta property="og:image:width" content="512">')
+        og_tags.append(f'    <meta property="og:image:height" content="512">')
+    og_tags.append(f'    <meta name="description" content="{escape(og_desc)}">')
+    # Twitter card
+    og_tags.append(f'    <meta name="twitter:card" content="summary">')
+    og_tags.append(f'    <meta name="twitter:title" content="{escape(title)}">')
+    if og_desc:
+        og_tags.append(f'    <meta name="twitter:description" content="{escape(og_desc)}">')
+    if og_image_url:
+        og_tags.append(f'    <meta name="twitter:image" content="{escape(og_image_url)}">')
+
+    og_block = '\n'.join(og_tags) + '\n'
+
+    # Inject OG tags before <title> and replace the title itself
+    output_html = source_html.replace(
+        '    <title>',
+        og_block + '    <title>'
+    )
+    # Replace the <title> content with the configured site title
+    import re as _re
+    output_html = _re.sub(r'<title>[^<]*</title>', f'<title>{escape(title)}</title>', output_html)
+
+    # Write to data/index.html
+    output_path = DATA_OUTPUT_DIR / 'index.html'
+    output_path.write_text(output_html, encoding='utf-8')
+    print(f"✓ Generated: {output_path}")
+
+
 def main():
-    global BASE_URL, SITE_URL
+    global BASE_URL, SITE_URL, SITE_TITLE
 
     args = sys.argv[1:]
     if '--base-url' in args:
@@ -923,11 +988,12 @@ def main():
             print(f"Using base URL: {BASE_URL}")
 
     # Load site_url from config.json
-    config_path = BASE_DIR / 'config.json'
+    config_path = CONFIG_PATH
     if config_path.exists():
         try:
             config = json.loads(config_path.read_text())
             SITE_URL = config.get('site_url', '').rstrip('/')
+            SITE_TITLE = config.get('site_title', '')
         except Exception:
             pass
 
@@ -1062,6 +1128,10 @@ def main():
 
     # Generate RSS feed
     generate_rss(discography, all_tracks)
+
+    # Generate index.html with OG tags and favicon
+    generate_index_html(discography)
+
     print(f"  Albums: {len(albums)}")
     print(f"  Singles/EPs: {len(singles)}")
     print(f"  Total tracks: {len(all_tracks)}")

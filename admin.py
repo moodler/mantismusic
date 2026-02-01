@@ -36,12 +36,12 @@ import yaml
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify, send_from_directory, Response
 
-BASE_DIR = Path(os.environ.get('MANTIS_PROJECT_DIR', Path(__file__).parent))
-app = Flask(__name__, template_folder=str(BASE_DIR / 'templates'))
-MUSIC_DIR = BASE_DIR / "music"
-TRACKS_DIR = MUSIC_DIR / "tracks"
-COLLECTIONS_DIR = MUSIC_DIR / "collections"
-ARTIST_DIR = MUSIC_DIR / "artist"
+from paths import (APP_DIR, DATA_DIR, TEMPLATES_DIR, JS_DIR, CSS_DIR, INDEX_HTML,
+                   BUILD_SCRIPT, MUSIC_DIR, TRACKS_DIR, COLLECTIONS_DIR, ARTIST_DIR,
+                   CONFIG_PATH, DATA_OUTPUT_DIR, OUTPUT_PATH, RSS_PATH, FEED_PAGES_DIR)
+
+app = Flask(__name__, template_folder=str(TEMPLATES_DIR))
+
 
 IMAGE_EXTS = ('.jpg', '.jpeg', '.png', '.gif', '.webp')
 AUDIO_EXTS = ('.mp3', '.m4a', '.flac', '.wav')
@@ -682,9 +682,13 @@ def upload_artist_banner():
 @app.route('/api/build', methods=['POST'])
 def run_build():
     try:
+        env = os.environ.copy()
+        env['MANTIS_DATA_DIR'] = str(DATA_DIR)
+        env['PYTHONPATH'] = str(APP_DIR) + os.pathsep + env.get('PYTHONPATH', '')
         result = subprocess.run(
-            ['python3', str(BASE_DIR / 'build_music_json.py')],
-            capture_output=True, text=True, cwd=str(BASE_DIR), timeout=30
+            ['python3', str(BUILD_SCRIPT)],
+            capture_output=True, text=True, cwd=str(DATA_DIR), timeout=30,
+            env=env
         )
         return jsonify(
             ok=result.returncode == 0,
@@ -699,12 +703,11 @@ def run_build():
 
 @app.route('/api/deploy', methods=['POST'])
 def run_deploy():
-    config_path = BASE_DIR / 'config.json'
-    if not config_path.exists():
+    if not CONFIG_PATH.exists():
         return jsonify(ok=False, stderr='config.json not found', returncode=-1)
 
     try:
-        config = json.loads(config_path.read_text())
+        config = json.loads(CONFIG_PATH.read_text())
     except Exception as e:
         return jsonify(ok=False, stderr=f'Invalid config.json: {e}', returncode=-1)
     deploy = config.get('deploy', {})
@@ -715,21 +718,25 @@ def run_deploy():
                        stderr='Deploy destination not configured.\n\nAdd to config.json:\n  "deploy": {\n    "destination": "user@host:/path/to/site/"\n  }',
                        returncode=-1)
 
-    deployignore = BASE_DIR / '.deployignore'
+    deployignore = DATA_DIR / '.deployignore'
     cmd = [
         'rsync', '-avz', '--delete', '--progress',
         '-e', 'ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes',
     ]
     if deployignore.exists():
         cmd += ['--exclude-from', str(deployignore)]
+    # Use build-generated index.html (has OG tags) if available, else source
+    generated_index = DATA_OUTPUT_DIR / 'index.html'
+    index_to_deploy = str(generated_index) if generated_index.exists() else str(INDEX_HTML)
+    # App code assets from APP_DIR, user data from DATA_DIR
     cmd += [
-        str(BASE_DIR / 'index.html'),
-        str(BASE_DIR / 'feed.rss'),
-        str(BASE_DIR / 'feed'),
-        str(BASE_DIR / 'js'),
-        str(BASE_DIR / 'css'),
-        str(BASE_DIR / 'data'),
-        str(BASE_DIR / 'music'),
+        index_to_deploy,
+        str(JS_DIR),
+        str(CSS_DIR),
+        str(RSS_PATH),
+        str(FEED_PAGES_DIR),
+        str(DATA_OUTPUT_DIR),
+        str(MUSIC_DIR),
         destination
     ]
 
@@ -739,10 +746,14 @@ def run_deploy():
     def stream():
         try:
             # Run build first
+            env = os.environ.copy()
+            env['MANTIS_DATA_DIR'] = str(DATA_DIR)
+            env['PYTHONPATH'] = str(APP_DIR) + os.pathsep + env.get('PYTHONPATH', '')
             yield f"data: {json.dumps({'line': 'Building discography.json...'})}\n\n"
             build = subprocess.run(
-                ['python3', str(BASE_DIR / 'build_music_json.py')],
-                capture_output=True, text=True, cwd=str(BASE_DIR), timeout=30
+                ['python3', str(BUILD_SCRIPT)],
+                capture_output=True, text=True, cwd=str(DATA_DIR), timeout=30,
+                env=env
             )
             if build.stdout:
                 for bline in build.stdout.strip().splitlines():
@@ -756,7 +767,7 @@ def run_deploy():
 
             proc = subprocess.Popen(
                 cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                text=True, cwd=str(BASE_DIR)
+                text=True, cwd=str(DATA_DIR)
             )
             files_done = 0
             total_files = 0
@@ -793,16 +804,16 @@ def health_api():
 
 @app.route('/settings')
 def settings_page():
-    config_path = BASE_DIR / 'config.json'
     config = {}
-    if config_path.exists():
+    if CONFIG_PATH.exists():
         try:
-            config = json.loads(config_path.read_text())
+            config = json.loads(CONFIG_PATH.read_text())
         except Exception:
             pass
     deploy = config.get('deploy', {})
     return render_template('admin_settings.html',
-                           project_dir=str(BASE_DIR),
+                           data_dir=str(DATA_DIR),
+                           site_title=config.get('site_title', ''),
                            site_url=config.get('site_url', ''),
                            deploy_destination=deploy.get('destination', ''),
                            spotify_client_id=config.get('spotify_client_id', ''),
@@ -811,18 +822,19 @@ def settings_page():
 
 @app.route('/api/settings', methods=['GET', 'POST'])
 def settings_api():
-    config_path = BASE_DIR / 'config.json'
     if request.method == 'GET':
-        return jsonify(project_dir=str(BASE_DIR))
+        return jsonify(data_dir=str(DATA_DIR))
 
     data = request.json or {}
     config = {}
-    if config_path.exists():
+    if CONFIG_PATH.exists():
         try:
-            config = json.loads(config_path.read_text())
+            config = json.loads(CONFIG_PATH.read_text())
         except Exception:
             pass
 
+    if 'site_title' in data:
+        config['site_title'] = data['site_title']
     if 'site_url' in data:
         config['site_url'] = data['site_url']
     if 'deploy_destination' in data:
@@ -833,13 +845,42 @@ def settings_api():
         config['spotify_client_secret'] = data['spotify_client_secret']
 
     try:
-        config_path.write_text(json.dumps(config, indent=2) + '\n')
+        CONFIG_PATH.write_text(json.dumps(config, indent=2) + '\n')
         return jsonify(ok=True)
     except Exception as e:
         return jsonify(ok=False, error=str(e))
 
 
-# Serve music files
+# ---------------------------------------------------------------------------
+# Static file routes (serve bundled app assets and user data)
+# ---------------------------------------------------------------------------
+
+@app.route('/js/<path:filename>')
+def serve_js(filename):
+    return send_from_directory(str(JS_DIR), filename)
+
+
+@app.route('/css/<path:filename>')
+def serve_css(filename):
+    return send_from_directory(str(CSS_DIR), filename)
+
+
+@app.route('/data/<path:filename>')
+def serve_data(filename):
+    return send_from_directory(str(DATA_OUTPUT_DIR), filename)
+
+
+@app.route('/feed.rss')
+def serve_rss():
+    return send_from_directory(str(RSS_PATH.parent), RSS_PATH.name,
+                               mimetype='application/rss+xml')
+
+
+@app.route('/feed/<path:filename>')
+def serve_feed_pages(filename):
+    return send_from_directory(str(FEED_PAGES_DIR), filename)
+
+
 @app.route('/music/<path:filename>')
 def serve_music(filename):
     return send_from_directory(str(MUSIC_DIR), filename)

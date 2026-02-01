@@ -20,12 +20,22 @@
         </div>
 
         <div class="form-group">
-            <label>Project Directory</label>
-            <input type="text" class="form-input" id="field-project-dir"
-                   value="{{ project_dir }}" readonly
+            <label>Data Directory</label>
+            <input type="text" class="form-input" id="field-data-dir"
+                   value="{{ data_dir }}" readonly
                    style="opacity: 0.7; cursor: default;">
             <small style="color: var(--text-muted); display: block; margin-top: 4px;">
-                The root directory containing music/, templates/, and config files.
+                The directory containing music files, config, and generated output.
+            </small>
+        </div>
+
+        <div class="form-group">
+            <label>Site Title</label>
+            <input type="text" class="form-input" id="field-site-title"
+                   value="{{ site_title }}"
+                   placeholder="My Artist Name">
+            <small style="color: var(--text-muted); display: block; margin-top: 4px;">
+                The page title and OpenGraph title. Defaults to artist name if empty.
             </small>
         </div>
 
@@ -78,6 +88,7 @@
 <script>
     async function saveSettings() {
         const data = {
+            site_title: document.getElementById('field-site-title').value,
             site_url: document.getElementById('field-site-url').value,
             deploy_destination: document.getElementById('field-deploy-dest').value,
             spotify_client_id: document.getElementById('field-spotify-id').value,

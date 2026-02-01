@@ -38,6 +38,21 @@ PORT = 5001
 APP_SUPPORT = Path.home() / 'Library' / 'Application Support' / APP_NAME
 PREFS_FILE = APP_SUPPORT / 'preferences.json'
 
+DEFAULT_CONFIG = {
+    "site_url": "",
+    "spotify_client_id": "",
+    "spotify_client_secret": "",
+    "deploy": {
+        "destination": ""
+    }
+}
+
+DEFAULT_ARTIST_MD = """---
+name: My Artist Name
+---
+Write your artist bio here.
+"""
+
 
 def load_prefs():
     """Load preferences from disk."""
@@ -55,14 +70,32 @@ def save_prefs(prefs):
     PREFS_FILE.write_text(json.dumps(prefs, indent=2))
 
 
-def validate_project_dir(path):
-    """Check if a directory looks like a Mantis Music project."""
+def validate_data_dir(path):
+    """Check if a directory looks like a Mantis Music data directory."""
     p = Path(path)
-    return (p / 'admin.py').exists() and (p / 'templates').is_dir()
+    return (p / 'music').is_dir() or (p / 'config.json').exists()
 
 
-def pick_project_dir():
-    """Show a native folder picker dialog to choose the project directory."""
+def initialize_data_dir(path):
+    """Create the data directory structure for first-time use."""
+    p = Path(path)
+    (p / 'music' / 'artist').mkdir(parents=True, exist_ok=True)
+    (p / 'music' / 'tracks').mkdir(parents=True, exist_ok=True)
+    (p / 'music' / 'collections').mkdir(parents=True, exist_ok=True)
+    (p / 'data').mkdir(parents=True, exist_ok=True)
+    (p / 'feed').mkdir(parents=True, exist_ok=True)
+
+    config_path = p / 'config.json'
+    if not config_path.exists():
+        config_path.write_text(json.dumps(DEFAULT_CONFIG, indent=2) + '\n')
+
+    artist_md = p / 'music' / 'artist' / 'artist.md'
+    if not artist_md.exists():
+        artist_md.write_text(DEFAULT_ARTIST_MD.lstrip())
+
+
+def pick_data_dir():
+    """Show a native folder picker dialog to choose the data directory."""
     import webview
 
     result = []
@@ -77,16 +110,16 @@ def pick_project_dir():
         window.destroy()
 
     window = webview.create_window(
-        'Mantis Music — Choose Project Folder',
+        'Mantis Music — Choose Data Folder',
         html='''<!DOCTYPE html><html><body style="
             font-family: -apple-system, system-ui, sans-serif;
             display: flex; flex-direction: column; align-items: center;
             justify-content: center; height: 90vh; background: #1a1a2e; color: #e0e0e0;
             margin: 0;">
             <h1 style="margin-bottom: 8px;">Mantis Music</h1>
-            <p style="color: #999; margin-bottom: 24px;">Select your Mantis Music project folder</p>
+            <p style="color: #999; margin-bottom: 24px;">Select a folder for your music data</p>
             <p style="color: #666; font-size: 13px;">
-                The folder should contain admin.py, templates/, music/, etc.
+                Choose an empty folder or an existing Mantis Music data folder.
             </p>
         </body></html>''',
         width=500,
@@ -97,32 +130,40 @@ def pick_project_dir():
     return result[0] if result else None
 
 
-def get_project_dir():
-    """Determine the project directory from prefs, dialog, or defaults."""
+def get_data_dir():
+    """Determine the data directory from prefs, dialog, or defaults."""
     # Running from source — use the script's own directory
     if not getattr(sys, 'frozen', False):
         return Path(__file__).parent
 
     # Running as bundled .app — check preferences
     prefs = load_prefs()
-    project_dir = prefs.get('project_dir', '')
 
-    if project_dir and validate_project_dir(project_dir):
-        return Path(project_dir)
+    # Migrate old project_dir preference
+    if 'project_dir' in prefs and 'data_dir' not in prefs:
+        prefs['data_dir'] = prefs.pop('project_dir')
+        save_prefs(prefs)
+
+    data_dir = prefs.get('data_dir', '')
+
+    if data_dir and validate_data_dir(data_dir):
+        return Path(data_dir)
 
     # No valid preference — ask the user to pick
-    chosen = pick_project_dir()
+    chosen = pick_data_dir()
     if not chosen:
         sys.exit(0)  # User cancelled
 
-    if not validate_project_dir(chosen):
-        # Try again with an error? For now just use it anyway
-        pass
+    chosen_path = Path(chosen)
+
+    # Initialize if empty or new
+    if not validate_data_dir(chosen_path):
+        initialize_data_dir(chosen_path)
 
     # Save the choice
-    prefs['project_dir'] = chosen
+    prefs['data_dir'] = chosen
     save_prefs(prefs)
-    return Path(chosen)
+    return chosen_path
 
 
 def start_flask(app):
@@ -145,13 +186,12 @@ def wait_for_server(timeout=10):
 def main():
     import webview
 
-    project_dir = get_project_dir()
+    data_dir = get_data_dir()
 
-    os.environ['MANTIS_PROJECT_DIR'] = str(project_dir)
-    os.chdir(project_dir)
+    # Set env var so paths.py resolves DATA_DIR correctly
+    os.environ['MANTIS_DATA_DIR'] = str(data_dir)
 
-    # Import the Flask app (after setting env var and cwd)
-    sys.path.insert(0, str(project_dir))
+    # Import the Flask app (after setting env var)
     from admin import app
 
     # Start Flask in daemon thread
@@ -164,7 +204,7 @@ def main():
             'Mantis Music — Error',
             html='<body style="font-family:system-ui;padding:40px;background:#1a1a2e;color:#e0e0e0;">'
                  '<h2>Server failed to start</h2>'
-                 f'<p>Could not start Flask server from:<br><code>{project_dir}</code></p></body>',
+                 f'<p>Could not start Flask server with data at:<br><code>{data_dir}</code></p></body>',
             width=500, height=250,
         )
         webview.start()
