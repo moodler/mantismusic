@@ -74,11 +74,11 @@ function syncTrackDetailPlayBtn() {
     if (!trackDetailPlayBtn || !trackDetailTrack) return;
     const isCurrentlyPlaying = currentTrack === trackDetailTrack && isPlaying;
     if (isCurrentlyPlaying) {
-        trackDetailPlayBtn.innerHTML = '&#9654; Playing now';
+        trackDetailPlayBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
         trackDetailPlayBtn.disabled = true;
         trackDetailPlayBtn.classList.add('playing-now');
     } else {
-        trackDetailPlayBtn.innerHTML = '&#9654; Play';
+        trackDetailPlayBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
         trackDetailPlayBtn.disabled = false;
         trackDetailPlayBtn.classList.remove('playing-now');
     }
@@ -1520,7 +1520,8 @@ function showReleaseDetail(release) {
 
         const playBtn = document.createElement('button');
         playBtn.className = 'single-play-btn';
-        playBtn.innerHTML = '▶ Play';
+        playBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+        playBtn.title = 'Play';
         playBtn.onclick = (e) => {
             e.stopPropagation();
             playTrack(release, release);
@@ -1528,7 +1529,8 @@ function showReleaseDetail(release) {
 
         const queueBtn = document.createElement('button');
         queueBtn.className = 'single-queue-btn';
-        queueBtn.innerHTML = '+ Add to Queue';
+        queueBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"/></svg>';
+        queueBtn.title = 'Add to queue';
         queueBtn.onclick = (e) => {
             e.stopPropagation();
             addToQueue(release, release);
@@ -1547,7 +1549,8 @@ function showReleaseDetail(release) {
             downloadBtn.className = 'single-download-btn';
             downloadBtn.href = resolveDataUrl(release.wavFile);
             downloadBtn.download = '';
-            downloadBtn.innerHTML = '↓ Download WAV';
+            downloadBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>';
+        downloadBtn.title = 'Download WAV';
             singleControls.appendChild(downloadBtn);
         }
 
@@ -1768,7 +1771,8 @@ function showTrackDetail(track, release) {
 
     const queueBtn = document.createElement('button');
     queueBtn.className = 'single-queue-btn';
-    queueBtn.innerHTML = '+ Add to Queue';
+    queueBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"/></svg>';
+        queueBtn.title = 'Add to queue';
     queueBtn.onclick = (e) => {
         e.stopPropagation();
         addToQueue(track, release);
@@ -1784,7 +1788,8 @@ function showTrackDetail(track, release) {
         downloadBtn.className = 'single-download-btn';
         downloadBtn.href = resolveDataUrl(wavFile);
         downloadBtn.download = '';
-        downloadBtn.innerHTML = '↓ Download WAV';
+        downloadBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>';
+        downloadBtn.title = 'Download WAV';
         singleControls.appendChild(downloadBtn);
     }
 
