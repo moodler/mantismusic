@@ -46,6 +46,18 @@ app = Flask(__name__, template_folder=str(TEMPLATES_DIR))
 IMAGE_EXTS = ('.jpg', '.jpeg', '.png', '.gif', '.webp')
 AUDIO_EXTS = ('.mp3', '.m4a', '.flac', '.wav')
 
+# Map MIME subtypes to file extensions for pasted images
+_MIME_TO_EXT = {'png': '.png', 'gif': '.gif', 'webp': '.webp',
+                'jpeg': '.jpg', 'jpg': '.jpg'}
+
+
+def ext_from_data_url(header):
+    """Extract file extension from a data URL header like 'data:image/webp;base64'."""
+    for mime, ext in _MIME_TO_EXT.items():
+        if mime in header:
+            return ext
+    return '.jpg'
+
 
 # ---------------------------------------------------------------------------
 # Data helpers
@@ -496,7 +508,7 @@ def upload_track_cover(slug):
     elif request.is_json and request.json.get('dataUrl'):
         data_url = request.json['dataUrl']
         header, data = data_url.split(',', 1)
-        ext = '.png' if 'png' in header else '.jpg'
+        ext = ext_from_data_url(header)
         dest = track_dir / f"{slug}{ext}"
         dest.write_bytes(base64.b64decode(data))
     else:
@@ -595,7 +607,7 @@ def upload_collection_cover(slug):
     elif request.is_json and request.json.get('dataUrl'):
         data_url = request.json['dataUrl']
         header, data = data_url.split(',', 1)
-        ext = '.png' if 'png' in header else '.jpg'
+        ext = ext_from_data_url(header)
         dest = coll_dir / f"{slug}{ext}"
         dest.write_bytes(base64.b64decode(data))
     else:
@@ -649,7 +661,7 @@ def upload_artist_profile():
     elif request.is_json and request.json.get('dataUrl'):
         data_url = request.json['dataUrl']
         header, data = data_url.split(',', 1)
-        ext = '.png' if 'png' in header else '.jpg'
+        ext = ext_from_data_url(header)
         dest = ARTIST_DIR / f"profile{ext}"
         dest.write_bytes(base64.b64decode(data))
     else:
@@ -670,7 +682,7 @@ def upload_artist_banner():
     elif request.is_json and request.json.get('dataUrl'):
         data_url = request.json['dataUrl']
         header, data = data_url.split(',', 1)
-        ext = '.png' if 'png' in header else '.jpg'
+        ext = ext_from_data_url(header)
         dest = ARTIST_DIR / f"banner{ext}"
         dest.write_bytes(base64.b64decode(data))
     else:
