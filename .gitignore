@@ -10,7 +10,7 @@ feed/
 dist/
 build/
 *.spec
-icon.icns
+icon.png
 __pycache__/
 
 # Screenshots
