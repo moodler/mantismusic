@@ -936,10 +936,18 @@ def generate_index_html(discography):
         if SITE_URL:
             og_image_url = f"{SITE_URL}/{og_image_path}"
 
-    # Read source index.html
-    source_html = INDEX_HTML.read_text(encoding='utf-8')
+    import re as _re
 
-    # Build OG meta tags
+    # Read source index.html and replace hardcoded titles with configured values
+    source_html = INDEX_HTML.read_text(encoding='utf-8')
+    source_html = _re.sub(r'<title>[^<]*</title>', f'<title>{escape(title)}</title>', source_html)
+    source_html = _re.sub(r'(rel="alternate"[^>]*title=")[^"]*(")', rf'\g<1>{escape(title)}\2', source_html)
+
+    # Write updated root index.html
+    INDEX_HTML.write_text(source_html, encoding='utf-8')
+    print(f"✓ Updated: {INDEX_HTML}")
+
+    # Build OG meta tags for the deploy version
     og_tags = []
     og_tags.append(f'    <meta property="og:type" content="website">')
     og_tags.append(f'    <meta property="og:title" content="{escape(title)}">')
@@ -962,18 +970,15 @@ def generate_index_html(discography):
 
     og_block = '\n'.join(og_tags) + '\n'
 
-    # Inject OG tags before <title> and replace the title itself
-    output_html = source_html.replace(
+    # Inject OG tags into a copy for deployment
+    deploy_html = source_html.replace(
         '    <title>',
         og_block + '    <title>'
     )
-    # Replace the <title> content with the configured site title
-    import re as _re
-    output_html = _re.sub(r'<title>[^<]*</title>', f'<title>{escape(title)}</title>', output_html)
 
-    # Write to data/index.html
+    # Write to data/index.html (for deploy)
     output_path = DATA_OUTPUT_DIR / 'index.html'
-    output_path.write_text(output_html, encoding='utf-8')
+    output_path.write_text(deploy_html, encoding='utf-8')
     print(f"✓ Generated: {output_path}")
 
 
