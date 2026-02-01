@@ -5,6 +5,13 @@ images/
 
 # Build output
 data/discography.json
+feed.rss
+feed/
+dist/
+build/
+*.spec
+icon.icns
+__pycache__/
 
 # Screenshots
 screenshot-*.jpg

@@ -140,6 +140,19 @@ body::before {
     background: var(--bg-secondary);
 }
 
+.rss-link {
+    display: flex;
+    align-items: center;
+    color: var(--text-secondary);
+    padding: 0.4rem;
+    border-radius: 6px;
+    transition: color 0.2s;
+}
+
+.rss-link:hover {
+    color: #f8a100;
+}
+
 /* Hero Banner */
 .hero-section {
     position: relative;

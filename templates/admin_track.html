@@ -9,6 +9,10 @@
         <h1 id="page-title">{% if track %}{{ track.frontmatter.get('title', slug) }}{% else %}New Track{% endif %}</h1>
     </div>
     <div class="flex gap-1">
+        {% if track %}
+        <a href="/track/{{ prev_slug }}" class="btn btn-secondary{% if not prev_slug %} disabled{% endif %}"{% if not prev_slug %} tabindex="-1"{% endif %}>&larr; Prev</a>
+        <a href="/track/{{ next_slug }}" class="btn btn-secondary{% if not next_slug %} disabled{% endif %}"{% if not next_slug %} tabindex="-1"{% endif %}>Next &rarr;</a>
+        {% endif %}
         <button class="btn btn-primary" onclick="saveTrack()">Save</button>
     </div>
 </div>
@@ -122,22 +126,48 @@
                 </div>
             </div>
 
-            <!-- Audio Player -->
-            {% if track and track.audio_url %}
+            <!-- Audio Files -->
+            {% if track %}
+            {% for fmt in ['MP3', 'WAV'] %}
+            {% set info = track.audio_by_format.get(fmt) %}
+            <div class="form-group mt-2" id="audio-section-{{ fmt|lower }}">
+                <label>{{ fmt }}</label>
+                {% if info %}
+                <div class="card" style="padding: 0.75rem 1rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                        <span style="background: var(--accent); color: #fff; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 4px;">{{ fmt }}</span>
+                        <span class="text-sm text-muted" id="audio-name-{{ fmt|lower }}">{{ info.filename }}</span>
+                        <button class="btn btn-danger btn-sm" style="margin-left: auto; font-size: 11px;" onclick="deleteAudio('{{ fmt|lower }}')">Remove</button>
+                    </div>
+                    <audio controls style="width: 100%; border-radius: 6px;" id="audio-player-{{ fmt|lower }}" src="{{ info.url }}"></audio>
+                </div>
+                {% else %}
+                <div class="card audio-upload-zone" style="text-align: center; color: var(--text-muted); padding: 1.5rem; cursor: pointer; border: 2px dashed var(--border);"
+                     onclick="document.getElementById('audio-input-{{ fmt|lower }}').click()"
+                     id="audio-drop-{{ fmt|lower }}">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style="margin-bottom: 4px;"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13zM9 13h6v2H9v-2zm0 4h6v2H9v-2z"/></svg>
+                    <div>Click or drag to upload {{ fmt }}</div>
+                </div>
+                {% endif %}
+                <input type="file" id="audio-input-{{ fmt|lower }}" accept="audio/{{ fmt|lower }}" style="display: none"
+                       onchange="uploadAudio('{{ fmt|lower }}', this.files[0])">
+            </div>
+            {% endfor %}
+
+            {% for fmt, info in track.audio_by_format.items() %}
+            {% if fmt not in ['MP3', 'WAV'] %}
             <div class="form-group mt-2">
-                <label>Audio</label>
-                <audio controls style="width: 100%; border-radius: 6px;" src="{{ track.audio_url }}"></audio>
-                <div class="text-sm text-muted mt-1">
-                    Files: {{ track.audio_files|join(', ') }}
+                <label>{{ fmt }}</label>
+                <div class="card" style="padding: 0.75rem 1rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                        <span style="background: var(--accent); color: #fff; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 4px;">{{ fmt }}</span>
+                        <span class="text-sm text-muted">{{ info.filename }}</span>
+                    </div>
+                    <audio controls style="width: 100%; border-radius: 6px;" src="{{ info.url }}"></audio>
                 </div>
             </div>
-            {% elif track %}
-            <div class="form-group mt-2">
-                <label>Audio</label>
-                <div class="card" style="text-align: center; color: var(--text-muted); padding: 2rem;">
-                    No audio file found
-                </div>
-            </div>
+            {% endif %}
+            {% endfor %}
             {% endif %}
 
             <!-- Lyrics -->
@@ -285,5 +315,72 @@
             showToast('Error: ' + e.message, 'error');
         }
     }
+
+    // Audio upload
+    async function uploadAudio(fmt, file) {
+        if (!file) return;
+        const formData = new FormData();
+        formData.append('file', file);
+        try {
+            const resp = await fetch(`/api/track/${slug}/audio/${fmt}`, {
+                method: 'POST',
+                body: formData
+            });
+            const result = await resp.json();
+            if (result.ok) {
+                showToast(`${fmt.toUpperCase()} uploaded`);
+                // Replace the upload zone with a player
+                const section = document.getElementById(`audio-section-${fmt}`);
+                section.querySelector('.card').outerHTML = `
+                    <div class="card" style="padding: 0.75rem 1rem;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                            <span style="background: var(--accent); color: #fff; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 4px;">${fmt.toUpperCase()}</span>
+                            <span class="text-sm text-muted" id="audio-name-${fmt}">${result.filename}</span>
+                            <button class="btn btn-danger btn-sm" style="margin-left: auto; font-size: 11px;" onclick="deleteAudio('${fmt}')">Remove</button>
+                        </div>
+                        <audio controls style="width: 100%; border-radius: 6px;" id="audio-player-${fmt}" src="${result.url}"></audio>
+                    </div>`;
+            } else {
+                showToast(result.error || 'Upload failed', 'error');
+            }
+        } catch (e) {
+            showToast('Error: ' + e.message, 'error');
+        }
+    }
+
+    async function deleteAudio(fmt) {
+        if (!confirm(`Remove ${fmt.toUpperCase()} file?`)) return;
+        try {
+            const resp = await fetch(`/api/track/${slug}/audio/${fmt}`, { method: 'DELETE' });
+            const result = await resp.json();
+            if (result.ok) {
+                showToast(`${fmt.toUpperCase()} removed`);
+                const section = document.getElementById(`audio-section-${fmt}`);
+                section.querySelector('.card').outerHTML = `
+                    <div class="card audio-upload-zone" style="text-align: center; color: var(--text-muted); padding: 1.5rem; cursor: pointer; border: 2px dashed var(--border);"
+                         onclick="document.getElementById('audio-input-${fmt}').click()"
+                         id="audio-drop-${fmt}">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style="margin-bottom: 4px;"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13zM9 13h6v2H9v-2zm0 4h6v2H9v-2z"/></svg>
+                        <div>Click or drag to upload ${fmt.toUpperCase()}</div>
+                    </div>`;
+            } else {
+                showToast(result.error || 'Delete failed', 'error');
+            }
+        } catch (e) {
+            showToast('Error: ' + e.message, 'error');
+        }
+    }
+
+    // Drag-and-drop for audio upload zones
+    document.querySelectorAll('.audio-upload-zone').forEach(zone => {
+        const fmt = zone.id.replace('audio-drop-', '');
+        zone.addEventListener('dragover', e => { e.preventDefault(); zone.style.borderColor = 'var(--accent)'; });
+        zone.addEventListener('dragleave', () => { zone.style.borderColor = 'var(--border)'; });
+        zone.addEventListener('drop', e => {
+            e.preventDefault();
+            zone.style.borderColor = 'var(--border)';
+            if (e.dataTransfer.files.length) uploadAudio(fmt, e.dataTransfer.files[0]);
+        });
+    });
 </script>
 {% endblock %}

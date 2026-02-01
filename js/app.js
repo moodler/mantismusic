@@ -121,11 +121,11 @@ function findTrackBySlug(slug) {
     // Check singles first (their id IS the slug)
     const single = discographyData.singles.find(s => s.id === slug);
     if (single) return { track: single, release: single };
-    // Check tracks within albums
-    for (const album of discographyData.albums) {
-        if (!album.tracks) continue;
-        const track = album.tracks.find(t => t.slug === slug);
-        if (track) return { track, release: album };
+    // Check tracks within all releases (albums and EPs)
+    for (const release of [...discographyData.albums, ...discographyData.singles]) {
+        if (!release.tracks) continue;
+        const track = release.tracks.find(t => t.slug === slug);
+        if (track) return { track, release };
     }
     return null;
 }
@@ -1113,8 +1113,12 @@ function hideAllSections() {
     document.getElementById('discography-section').classList.add('hidden');
     document.getElementById('collections-section').classList.add('hidden');
     document.getElementById('tracks-section').classList.add('hidden');
-    document.getElementById('release-detail-section').classList.add('hidden');
-    document.getElementById('track-detail-section').classList.add('hidden');
+    const releaseDetail = document.getElementById('release-detail-section');
+    const trackDetail = document.getElementById('track-detail-section');
+    releaseDetail.classList.add('hidden');
+    releaseDetail.setAttribute('hidden', '');
+    trackDetail.classList.add('hidden');
+    trackDetail.setAttribute('hidden', '');
 }
 
 // Render current view
@@ -1122,8 +1126,15 @@ function renderView() {
     hideAllSections();
 
     // Update hash to reflect the current list view
-    const viewHashMap = { tracks: '#/', collections: '#/collections', about: '#/about' };
-    updateHash(viewHashMap[currentView] || '#/');
+    // For the default tracks view, use a clean URL with no hash
+    if (currentView === 'tracks') {
+        hashChangeFromCode = true;
+        history.replaceState(null, '', window.location.pathname);
+        hashChangeFromCode = false;
+    } else {
+        const viewHashMap = { collections: '#/collections', about: '#/about' };
+        updateHash(viewHashMap[currentView] || '');
+    }
 
     switch(currentView) {
         case 'about':
@@ -1647,7 +1658,9 @@ function showReleaseDetail(release) {
     const coverArtUrl = release.coverArt ? resolveDataUrl(release.coverArt) : null;
     applyGradientFromCover(coverArtUrl, gradientEl);
 
-    document.getElementById('release-detail-section').classList.remove('hidden');
+    const releaseEl = document.getElementById('release-detail-section');
+    releaseEl.classList.remove('hidden');
+    releaseEl.removeAttribute('hidden');
     window.scrollTo(0, 0);
 }
 
@@ -1872,7 +1885,9 @@ function showTrackDetail(track, release) {
     const trackCoverUrl = (track.coverArt || release.coverArt) ? resolveDataUrl(track.coverArt || release.coverArt) : null;
     applyGradientFromCover(trackCoverUrl, trackGradientEl);
 
-    document.getElementById('track-detail-section').classList.remove('hidden');
+    const trackEl = document.getElementById('track-detail-section');
+    trackEl.classList.remove('hidden');
+    trackEl.removeAttribute('hidden');
     window.scrollTo(0, 0);
 }
 

@@ -22,6 +22,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mantis Audiogram - Official Discography</title>
     <link rel="stylesheet" href="css/style.css">
+    <link rel="alternate" type="application/rss+xml" title="Mantis Audiogram" href="feed.rss">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap" rel="stylesheet">
@@ -31,7 +32,7 @@
     <header class="header">
         <div class="container">
             <div class="header-content">
-                <div class="logo-group" style="cursor:pointer" onclick="currentView='tracks';navigationHistory=[];document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.view==='tracks'));renderView();">
+                <div class="logo-group" style="cursor:pointer" onclick="currentView='tracks';navigationHistory=[];syncNavButton();renderView();">
                     <img src="music/artist/profile.jpg" alt="Mantis Audiogram" class="header-avatar">
                     <h1 class="logo">Mantis Audiogram</h1>
                 </div>
@@ -39,6 +40,9 @@
                     <button class="nav-btn active" data-view="tracks">Tracks</button>
                     <button class="nav-btn" data-view="collections">Collections</button>
                     <button class="nav-btn" data-view="about">About</button>
+                    <a href="feed.rss" class="rss-link" title="RSS Feed">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="6.18" cy="17.82" r="2.18"/><path d="M4 4.44v2.83c7.03 0 12.73 5.7 12.73 12.73h2.83c0-8.59-6.97-15.56-15.56-15.56zm0 5.66v2.83c3.9 0 7.07 3.17 7.07 7.07h2.83c0-5.47-4.43-9.9-9.9-9.9z"/></svg>
+                    </a>
                 </nav>
             </div>
         </div>
@@ -96,7 +100,7 @@
             </section>
 
             <!-- Release Detail Page -->
-            <section id="release-detail-section" class="detail-section hidden">
+            <section id="release-detail-section" class="detail-section hidden" hidden>
                 <div id="release-detail-gradient" class="detail-gradient"></div>
                 <button id="back-btn" class="back-btn">← Back</button>
                 <div class="detail-header">
@@ -128,7 +132,7 @@
             </section>
 
             <!-- Track Detail Page -->
-            <section id="track-detail-section" class="detail-section hidden">
+            <section id="track-detail-section" class="detail-section hidden" hidden>
                 <div id="track-detail-gradient" class="detail-gradient"></div>
                 <button id="track-back-btn" class="back-btn">← Back</button>
                 <div class="detail-header">

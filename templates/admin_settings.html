@@ -1,0 +1,100 @@
+{# Mantis Music - Copyright (C) 2026 Martin Dougiamas - GPL v3 #}
+{% extends "admin_base.html" %}
+{% block title %}Settings{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="breadcrumb"><a href="/">Dashboard</a> / Settings</div>
+        <h1>Settings</h1>
+    </div>
+    <div class="flex gap-1">
+        <button class="btn btn-primary" onclick="saveSettings()">Save</button>
+    </div>
+</div>
+
+<div class="page-content">
+    <div style="max-width: 640px;">
+        <div class="section-header">
+            <h2>Project</h2>
+        </div>
+
+        <div class="form-group">
+            <label>Project Directory</label>
+            <input type="text" class="form-input" id="field-project-dir"
+                   value="{{ project_dir }}" readonly
+                   style="opacity: 0.7; cursor: default;">
+            <small style="color: var(--text-muted); display: block; margin-top: 4px;">
+                The root directory containing music/, templates/, and config files.
+            </small>
+        </div>
+
+        <div class="form-group">
+            <label>Site URL</label>
+            <input type="url" class="form-input" id="field-site-url"
+                   value="{{ site_url }}"
+                   placeholder="https://example.com">
+            <small style="color: var(--text-muted); display: block; margin-top: 4px;">
+                The public URL of the site. Used in RSS feed and metadata.
+            </small>
+        </div>
+
+        <div class="section-header mt-3">
+            <h2>Deploy</h2>
+        </div>
+
+        <div class="form-group">
+            <label>Destination</label>
+            <input type="text" class="form-input" id="field-deploy-dest"
+                   value="{{ deploy_destination }}"
+                   placeholder="user@host:/var/www/site/">
+            <small style="color: var(--text-muted); display: block; margin-top: 4px;">
+                rsync destination in the format <code>user@host:/path/</code>
+            </small>
+        </div>
+
+        <div class="section-header mt-3">
+            <h2>Spotify API</h2>
+        </div>
+
+        <div class="form-group">
+            <label>Client ID</label>
+            <input type="text" class="form-input" id="field-spotify-id"
+                   value="{{ spotify_client_id }}"
+                   placeholder="Your Spotify API client ID">
+        </div>
+
+        <div class="form-group">
+            <label>Client Secret</label>
+            <input type="password" class="form-input" id="field-spotify-secret"
+                   value="{{ spotify_client_secret }}"
+                   placeholder="Your Spotify API client secret">
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function saveSettings() {
+        const data = {
+            site_url: document.getElementById('field-site-url').value,
+            deploy_destination: document.getElementById('field-deploy-dest').value,
+            spotify_client_id: document.getElementById('field-spotify-id').value,
+            spotify_client_secret: document.getElementById('field-spotify-secret').value,
+        };
+
+        try {
+            const resp = await fetch('/api/settings', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            const result = await resp.json();
+            showToast(result.ok ? 'Settings saved' : (result.error || 'Failed'), result.ok ? 'success' : 'error');
+        } catch (e) {
+            showToast('Error: ' + e.message, 'error');
+        }
+    }
+</script>
+{% endblock %}

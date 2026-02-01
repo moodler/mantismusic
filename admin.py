@@ -36,9 +36,8 @@ import yaml
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify, send_from_directory, Response
 
-app = Flask(__name__)
-
-BASE_DIR = Path(__file__).parent
+BASE_DIR = Path(os.environ.get('MANTIS_PROJECT_DIR', Path(__file__).parent))
+app = Flask(__name__, template_folder=str(BASE_DIR / 'templates'))
 MUSIC_DIR = BASE_DIR / "music"
 TRACKS_DIR = MUSIC_DIR / "tracks"
 COLLECTIONS_DIR = MUSIC_DIR / "collections"
@@ -305,20 +304,41 @@ def edit_track(slug):
         lyrics = lyrics_file.read_text(encoding='utf-8')
 
     # Find audio and cover files
-    audio_file = find_file(track_dir, ['.mp3', '.m4a', '.wav'])
+    audio_files = find_files(track_dir, AUDIO_EXTS)
     cover_file = find_file(track_dir, IMAGE_EXTS)
+
+    # Build per-format audio info
+    audio_by_format = {}
+    for af in audio_files:
+        ext = af.suffix.lstrip('.').lower()
+        label = ext.upper()
+        audio_by_format[label] = {
+            'url': f'/music/tracks/{slug}/{af.name}',
+            'filename': af.name,
+        }
+
+    # Determine prev/next tracks
+    all_slugs = sorted(
+        d.name for d in TRACKS_DIR.iterdir()
+        if d.is_dir() and not d.name.startswith('.')
+    ) if TRACKS_DIR.exists() else []
+    idx = all_slugs.index(slug) if slug in all_slugs else -1
+    prev_slug = all_slugs[idx - 1] if idx > 0 else None
+    next_slug = all_slugs[idx + 1] if 0 <= idx < len(all_slugs) - 1 else None
 
     track_data = {
         'slug': slug,
         'frontmatter': fm,
         'description': body,
         'lyrics': lyrics,
-        'audio_url': f'/music/tracks/{slug}/{audio_file.name}' if audio_file else None,
+        'audio_url': audio_by_format[next(iter(audio_by_format))]['url'] if audio_by_format else None,
         'cover_url': f'/music/tracks/{slug}/{cover_file.name}' if cover_file else None,
-        'audio_files': [f.name for f in find_files(track_dir, AUDIO_EXTS)],
+        'audio_files': [f.name for f in audio_files],
+        'audio_by_format': audio_by_format,
         'has_lyrics': lyrics_file is not None,
     }
     return render_template('admin_track.html', track=track_data, slug=slug,
+                           prev_slug=prev_slug, next_slug=next_slug,
                            collections=load_all_collections())
 
 
@@ -483,6 +503,33 @@ def upload_track_cover(slug):
         return jsonify(error="No image provided"), 400
 
     return jsonify(ok=True, url=f'/music/tracks/{slug}/{dest.name}')
+
+
+@app.route('/api/track/<slug>/audio/<fmt>', methods=['POST', 'DELETE'])
+def manage_track_audio(slug, fmt):
+    track_dir = TRACKS_DIR / slug
+    if not track_dir.exists():
+        return jsonify(error="Track not found"), 404
+
+    fmt = fmt.lower()
+    if fmt not in ('mp3', 'wav', 'm4a', 'flac'):
+        return jsonify(error="Unsupported format"), 400
+
+    if request.method == 'DELETE':
+        for f in track_dir.glob(f'*.{fmt}'):
+            f.unlink()
+        return jsonify(ok=True)
+
+    if 'file' not in request.files:
+        return jsonify(error="No file provided"), 400
+
+    file = request.files['file']
+    # Remove any existing file of this format
+    for f in track_dir.glob(f'*.{fmt}'):
+        f.unlink()
+    dest = track_dir / f"{slug}.{fmt}"
+    file.save(str(dest))
+    return jsonify(ok=True, url=f'/music/tracks/{slug}/{dest.name}', filename=dest.name)
 
 
 @app.route('/api/collection/<slug>/save', methods=['POST'])
@@ -677,6 +724,8 @@ def run_deploy():
         cmd += ['--exclude-from', str(deployignore)]
     cmd += [
         str(BASE_DIR / 'index.html'),
+        str(BASE_DIR / 'feed.rss'),
+        str(BASE_DIR / 'feed'),
         str(BASE_DIR / 'js'),
         str(BASE_DIR / 'css'),
         str(BASE_DIR / 'data'),
@@ -689,6 +738,22 @@ def run_deploy():
 
     def stream():
         try:
+            # Run build first
+            yield f"data: {json.dumps({'line': 'Building discography.json...'})}\n\n"
+            build = subprocess.run(
+                ['python3', str(BASE_DIR / 'build_music_json.py')],
+                capture_output=True, text=True, cwd=str(BASE_DIR), timeout=30
+            )
+            if build.stdout:
+                for bline in build.stdout.strip().splitlines():
+                    yield f"data: {json.dumps({'line': bline})}\n\n"
+            if build.returncode != 0:
+                stderr = build.stderr or 'Build failed'
+                yield f"data: {json.dumps({'done': True, 'ok': False, 'returncode': build.returncode, 'stderr': stderr})}\n\n"
+                return
+            yield f"data: {json.dumps({'line': ''})}\n\n"
+            yield f"data: {json.dumps({'line': 'Deploying via rsync...'})}\n\n"
+
             proc = subprocess.Popen(
                 cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                 text=True, cwd=str(BASE_DIR)
@@ -708,9 +773,8 @@ def run_deploy():
                     yield f"data: {json.dumps({'xfer': files_done, 'total': total_files, 'pct': pct, 'file': current_file})}\n\n"
                 # Skip partial progress lines (start with whitespace + numbers)
                 elif line and not line[0].isspace():
-                    # This is a filename or directory or status line
+                    # Store filename — it will be included in the next xfer event
                     current_file = line
-                    yield f"data: {json.dumps({'line': line})}\n\n"
             proc.stdout.close()
             stderr = proc.stderr.read()
             proc.stderr.close()
@@ -725,6 +789,54 @@ def run_deploy():
 @app.route('/api/health')
 def health_api():
     return jsonify(generate_health_report())
+
+
+@app.route('/settings')
+def settings_page():
+    config_path = BASE_DIR / 'config.json'
+    config = {}
+    if config_path.exists():
+        try:
+            config = json.loads(config_path.read_text())
+        except Exception:
+            pass
+    deploy = config.get('deploy', {})
+    return render_template('admin_settings.html',
+                           project_dir=str(BASE_DIR),
+                           site_url=config.get('site_url', ''),
+                           deploy_destination=deploy.get('destination', ''),
+                           spotify_client_id=config.get('spotify_client_id', ''),
+                           spotify_client_secret=config.get('spotify_client_secret', ''))
+
+
+@app.route('/api/settings', methods=['GET', 'POST'])
+def settings_api():
+    config_path = BASE_DIR / 'config.json'
+    if request.method == 'GET':
+        return jsonify(project_dir=str(BASE_DIR))
+
+    data = request.json or {}
+    config = {}
+    if config_path.exists():
+        try:
+            config = json.loads(config_path.read_text())
+        except Exception:
+            pass
+
+    if 'site_url' in data:
+        config['site_url'] = data['site_url']
+    if 'deploy_destination' in data:
+        config.setdefault('deploy', {})['destination'] = data['deploy_destination']
+    if 'spotify_client_id' in data:
+        config['spotify_client_id'] = data['spotify_client_id']
+    if 'spotify_client_secret' in data:
+        config['spotify_client_secret'] = data['spotify_client_secret']
+
+    try:
+        config_path.write_text(json.dumps(config, indent=2) + '\n')
+        return jsonify(ok=True)
+    except Exception as e:
+        return jsonify(ok=False, error=str(e))
 
 
 # Serve music files

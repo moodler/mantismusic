@@ -54,6 +54,9 @@ import time
 import yaml
 from pathlib import Path
 from datetime import datetime
+from email.utils import format_datetime
+from html import escape
+from xml.sax.saxutils import escape as xml_escape
 
 
 BASE_DIR = Path(__file__).parent
@@ -61,8 +64,11 @@ MUSIC_DIR = BASE_DIR / "music"
 TRACKS_DIR = MUSIC_DIR / "tracks"
 COLLECTIONS_DIR = MUSIC_DIR / "collections"
 OUTPUT_PATH = BASE_DIR / "data" / "discography.json"
+RSS_PATH = BASE_DIR / "feed.rss"
+FEED_PAGES_DIR = BASE_DIR / "feed"
 
 BASE_URL = ""
+SITE_URL = ""
 
 
 def parse_frontmatter(content):
@@ -728,8 +734,186 @@ def parse_release(release_dir, all_tracks):
     return release_data, release_type
 
 
+def generate_rss(discography, all_tracks):
+    """Generate an RSS feed with all tracks in chronological order."""
+    if not SITE_URL:
+        print("⚠ Skipping RSS: site_url not set in config.json")
+        return
+    artist = discography['artist']
+    bio = discography.get('bio', '')
+    # Extract domain for display (e.g. "https://example.com" -> "example.com")
+    site_domain = SITE_URL.split('://', 1)[-1]
+
+    # Flatten all tracks with their release info and date
+    feed_items = []
+    for release in discography['albums']:
+        for track in release.get('tracks', []):
+            feed_items.append({
+                'track': track,
+                'release': release,
+                'date': track.get('releaseDate') or release.get('releaseDate', ''),
+            })
+    for release in discography['singles']:
+        if release.get('tracks'):
+            # EP
+            for track in release['tracks']:
+                feed_items.append({
+                    'track': track,
+                    'release': release,
+                    'date': track.get('releaseDate') or release.get('releaseDate', ''),
+                })
+        else:
+            feed_items.append({
+                'track': release,
+                'release': release,
+                'date': release.get('releaseDate', ''),
+            })
+
+    # Sort by date, newest first
+    def sort_key(item):
+        try:
+            return datetime.strptime(str(item['date']), '%Y-%m-%d')
+        except (ValueError, TypeError):
+            return datetime.min
+    feed_items.sort(key=sort_key, reverse=True)
+
+    # Build date for channel
+    if feed_items and feed_items[0]['date']:
+        try:
+            build_dt = datetime.strptime(str(feed_items[0]['date']), '%Y-%m-%d')
+        except ValueError:
+            build_dt = datetime.now()
+    else:
+        build_dt = datetime.now()
+
+    now_rfc = format_datetime(datetime.now().astimezone())
+    feed_url = f"{SITE_URL}/feed.rss"
+
+    # Clean and recreate feed pages directory
+    import shutil
+    if FEED_PAGES_DIR.exists():
+        shutil.rmtree(FEED_PAGES_DIR)
+    FEED_PAGES_DIR.mkdir(parents=True)
+
+    items_xml = []
+    for item in feed_items:
+        track = item['track']
+        release = item['release']
+        title = xml_escape(track.get('title', ''))
+        slug = track.get('slug') or track.get('id', '')
+        player_link = f"{SITE_URL}/#/track/{slug}"
+        feed_link = f"{SITE_URL}/feed/{slug}.html"
+        description = track.get('description') or release.get('description') or ''
+        lyrics = track.get('lyrics', '')
+        cover = track.get('coverArt') or release.get('coverArt', '')
+        cover_url = f"{SITE_URL}/{cover}" if cover else ''
+
+        # Build content for RSS
+        content_parts = []
+        if cover:
+            content_parts.append(f'<p><img src="{xml_escape(cover_url)}" alt="{title}" style="max-width:300px" /></p>')
+        if description:
+            content_parts.append(f'<p>{xml_escape(description)}</p>')
+        if lyrics and lyrics.strip() and lyrics.strip() != '[Instrumental]':
+            content_parts.append(f'<h3>Lyrics</h3><pre>{xml_escape(lyrics)}</pre>')
+        content_parts.append(f'<p><a href="{xml_escape(player_link)}">Listen to {title} on {xml_escape(site_domain)}</a></p>')
+
+        content_html = '\n'.join(content_parts)
+
+        # Generate static HTML page for this track
+        tags_list = track.get('tags', []) + track.get('mood', [])
+        page_html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{title} — {xml_escape(artist)}</title>
+<meta name="description" content="{xml_escape(description)}">
+<meta property="og:title" content="{title}">
+<meta property="og:description" content="{xml_escape(description)}">
+<meta property="og:type" content="music.song">
+<meta property="og:url" content="{xml_escape(feed_link)}">
+{f'<meta property="og:image" content="{xml_escape(cover_url)}">' if cover_url else ''}
+<style>
+body {{ font-family: -apple-system, system-ui, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 2rem 1rem; background: #121212; color: #e0e0e0; }}
+img {{ max-width: 300px; border-radius: 8px; }}
+a {{ color: #1db954; }}
+h1 {{ margin-bottom: 0.25rem; }}
+.meta {{ color: #999; font-size: 0.9rem; margin-bottom: 1.5rem; }}
+.tags {{ display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 1.5rem; }}
+.tag {{ background: #282828; padding: 0.2rem 0.6rem; border-radius: 12px; font-size: 0.8rem; color: #aaa; }}
+pre {{ white-space: pre-wrap; color: #ccc; line-height: 1.6; }}
+.listen {{ display: inline-block; margin-top: 1.5rem; padding: 0.75rem 1.5rem; background: #1db954; color: #000; text-decoration: none; border-radius: 24px; font-weight: 600; }}
+.listen:hover {{ background: #1ed760; }}
+</style>
+</head>
+<body>
+{f'<img src="{xml_escape(cover_url)}" alt="{title}">' if cover_url else ''}
+<h1>{title}</h1>
+<p class="meta">{xml_escape(artist)}{f" &middot; {xml_escape(str(item['date'])[:4])}" if item['date'] else ''}{f" &middot; {xml_escape(track.get('duration', ''))}" if track.get('duration') else ''}</p>
+{f"<p>{xml_escape(description)}</p>" if description else ''}
+{f"<h2>Lyrics</h2><pre>{xml_escape(lyrics)}</pre>" if lyrics and lyrics.strip() and lyrics.strip() != '[Instrumental]' else ''}
+<a class="listen" href="{xml_escape(player_link)}">Listen on {xml_escape(site_domain)}</a>
+</body>
+</html>"""
+        page_path = FEED_PAGES_DIR / f"{slug}.html"
+        page_path.write_text(page_html, encoding='utf-8')
+
+        # Date
+        pub_date = ''
+        if item['date']:
+            try:
+                dt = datetime.strptime(str(item['date']), '%Y-%m-%d').astimezone()
+                pub_date = format_datetime(dt)
+            except (ValueError, TypeError):
+                pass
+
+        # Tags as categories
+        categories = ''.join(f'        <category>{xml_escape(t)}</category>\n' for t in tags_list)
+
+        # Duration
+        duration = track.get('duration', '')
+
+        item_xml = f"""    <item>
+      <title>{title}</title>
+      <link>{xml_escape(feed_link)}</link>
+      <guid isPermaLink="true">{xml_escape(feed_link)}</guid>
+      <description>{xml_escape(description)}</description>
+      <content:encoded><![CDATA[{content_html}]]></content:encoded>
+{categories}"""
+        if pub_date:
+            item_xml += f'      <pubDate>{pub_date}</pubDate>\n'
+        if cover:
+            item_xml += f'      <enclosure url="{xml_escape(cover_url)}" type="image/jpeg" length="0" />\n'
+        if duration:
+            item_xml += f'      <itunes:duration>{xml_escape(duration)}</itunes:duration>\n'
+        item_xml += '    </item>'
+        items_xml.append(item_xml)
+
+    rss = f"""<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"
+     xmlns:content="http://purl.org/rss/1.0/modules/content/"
+     xmlns:atom="http://www.w3.org/2005/Atom"
+     xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+  <channel>
+    <title>{xml_escape(artist)}</title>
+    <link>{SITE_URL}</link>
+    <description>{xml_escape(bio[:500])}</description>
+    <language>en</language>
+    <lastBuildDate>{now_rfc}</lastBuildDate>
+    <atom:link href="{xml_escape(feed_url)}" rel="self" type="application/rss+xml" />
+{chr(10).join(items_xml)}
+  </channel>
+</rss>
+"""
+    RSS_PATH.write_text(rss, encoding='utf-8')
+    print(f"✓ Generated: {RSS_PATH}")
+    print(f"  Feed items: {len(feed_items)}")
+    print(f"  Feed pages: {FEED_PAGES_DIR}/ ({len(feed_items)} pages)")
+
+
 def main():
-    global BASE_URL
+    global BASE_URL, SITE_URL
 
     args = sys.argv[1:]
     if '--base-url' in args:
@@ -737,6 +921,15 @@ def main():
         if idx + 1 < len(args):
             BASE_URL = args[idx + 1]
             print(f"Using base URL: {BASE_URL}")
+
+    # Load site_url from config.json
+    config_path = BASE_DIR / 'config.json'
+    if config_path.exists():
+        try:
+            config = json.loads(config_path.read_text())
+            SITE_URL = config.get('site_url', '').rstrip('/')
+        except Exception:
+            pass
 
     if not MUSIC_DIR.exists():
         print(f"ERROR: Music directory not found: {MUSIC_DIR}")
@@ -866,6 +1059,9 @@ def main():
         json.dump(discography, f, indent=2, ensure_ascii=False)
 
     print(f"\n✓ Generated: {OUTPUT_PATH}")
+
+    # Generate RSS feed
+    generate_rss(discography, all_tracks)
     print(f"  Albums: {len(albums)}")
     print(f"  Singles/EPs: {len(singles)}")
     print(f"  Total tracks: {len(all_tracks)}")
