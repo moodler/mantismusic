@@ -11,3 +11,4 @@ package-lock.json
 screenshot.jpg
 .DS_Store
 .deployignore
+raw-*

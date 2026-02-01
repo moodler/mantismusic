@@ -49,6 +49,7 @@ import base64
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 import yaml
@@ -166,9 +167,69 @@ def find_file(directory, extensions):
     """Find first file matching any of the extensions."""
     for ext in extensions:
         for f in directory.glob(f"*{ext}"):
-            if not f.name.startswith('.'):
+            if not f.name.startswith('.') and not f.name.startswith('raw-'):
                 return f
     return None
+
+
+MAX_IMAGE_SIZE = 1024
+
+
+def optimize_image(image_path):
+    """Optimize a cover image to 1024x1024 if oversized.
+
+    If any dimension exceeds MAX_IMAGE_SIZE:
+    1. Rename original to raw-{filename} (preserved for high-res use)
+    2. Scale so the smallest dimension = 1024
+    3. Center-crop to 1024x1024
+    Skips if raw-{filename} already exists (already optimized).
+    """
+    if not image_path or not image_path.exists():
+        return
+    raw_path = image_path.parent / f"raw-{image_path.name}"
+    if raw_path.exists():
+        return  # already optimized
+
+    # Get dimensions using sips
+    try:
+        result = subprocess.run(
+            ['sips', '-g', 'pixelWidth', '-g', 'pixelHeight', str(image_path)],
+            capture_output=True, text=True, timeout=10)
+        width = height = 0
+        for line in result.stdout.splitlines():
+            if 'pixelWidth' in line:
+                width = int(line.split(':')[-1].strip())
+            elif 'pixelHeight' in line:
+                height = int(line.split(':')[-1].strip())
+        if width <= MAX_IMAGE_SIZE and height <= MAX_IMAGE_SIZE:
+            return  # already small enough
+    except Exception:
+        return
+
+    # Save original as raw-{filename}
+    import shutil
+    shutil.copy2(image_path, raw_path)
+
+    # Scale so smallest dimension = MAX_IMAGE_SIZE
+    if width < height:
+        new_w = MAX_IMAGE_SIZE
+        new_h = int(height * MAX_IMAGE_SIZE / width)
+    else:
+        new_h = MAX_IMAGE_SIZE
+        new_w = int(width * MAX_IMAGE_SIZE / height)
+
+    subprocess.run(
+        ['sips', '-z', str(new_h), str(new_w), str(image_path)],
+        capture_output=True, timeout=30)
+
+    # Center-crop to MAX_IMAGE_SIZE x MAX_IMAGE_SIZE
+    crop_x = max(0, (new_w - MAX_IMAGE_SIZE) // 2)
+    crop_y = max(0, (new_h - MAX_IMAGE_SIZE) // 2)
+    subprocess.run(
+        ['sips', '-c', str(MAX_IMAGE_SIZE), str(MAX_IMAGE_SIZE), str(image_path)],
+        capture_output=True, timeout=30)
+
+    print(f"  Optimized image: {image_path.parent.name}/{image_path.name} ({width}x{height} -> {MAX_IMAGE_SIZE}x{MAX_IMAGE_SIZE}, original saved as raw-{image_path.name})")
 
 
 def build_asset_path(local_path, asset_type):
@@ -585,8 +646,10 @@ def load_all_tracks(spotify_token=None, tidal_token=None):
         if lyrics_file:
             lyrics = lyrics_file.read_text(encoding='utf-8').strip()
 
-        # Find track cover (optional)
+        # Find track cover (optional) and optimize if oversized
         track_cover = find_file(track_dir, ['.jpg', '.jpeg', '.png', '.gif', '.webp'])
+        if track_cover:
+            optimize_image(track_cover)
         track_cover_path = build_asset_path(track_cover, 'image') if track_cover else ""
 
         # Handle BPM
@@ -679,8 +742,10 @@ def parse_release(release_dir, all_tracks):
     release_id = get_release_id(release_dir.name)
     release_type = frontmatter.get('type', 'album')
 
-    # Find cover image
+    # Find cover image and optimize if oversized
     cover = find_file(release_dir, ['.jpg', '.jpeg', '.png', '.gif', '.webp'])
+    if cover:
+        optimize_image(cover)
     cover_path = build_asset_path(cover, 'image') if cover else ""
 
     # Build streaming links
