@@ -167,7 +167,7 @@ def find_file(directory, extensions):
     """Find first file matching any of the extensions."""
     for ext in extensions:
         for f in directory.glob(f"*{ext}"):
-            if not f.name.startswith('.') and not f.name.startswith('raw-'):
+            if not f.name.startswith('.') and not f.name.startswith('raw-') and not f.name.startswith('banner'):
                 return f
     return None
 
@@ -994,6 +994,7 @@ def generate_index_html(discography):
     og_image_path = ''
     og_image_url = ''
     if profile_img:
+        optimize_image(profile_img)
         ext = profile_img.suffix
         dest = DATA_OUTPUT_DIR / f"og-image{ext}"
         shutil.copy2(str(profile_img), str(dest))
