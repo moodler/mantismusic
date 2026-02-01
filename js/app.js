@@ -901,8 +901,14 @@ function formatTime(seconds) {
 // Load discography data
 async function loadDiscography() {
     try {
-        const response = await fetch('data/discography.json');
-        discographyData = await response.json();
+        // Use pre-loaded data (from discography.js script tag) if available,
+        // otherwise fetch JSON. This allows the site to work from file:// URLs.
+        if (window._discographyData) {
+            discographyData = window._discographyData;
+        } else {
+            const response = await fetch('data/discography.json');
+            discographyData = await response.json();
+        }
         filteredAlbums = discographyData.albums;
         filteredSingles = discographyData.singles;
         updateFilteredReleases();

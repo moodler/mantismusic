@@ -1124,7 +1124,15 @@ def main():
     with open(OUTPUT_PATH, 'w', encoding='utf-8') as f:
         json.dump(discography, f, indent=2, ensure_ascii=False)
 
+    # Also generate discography.js for file:// access (no fetch needed)
+    js_path = OUTPUT_PATH.parent / 'discography.js'
+    with open(js_path, 'w', encoding='utf-8') as f:
+        f.write('window._discographyData = ')
+        json.dump(discography, f, indent=2, ensure_ascii=False)
+        f.write(';\n')
+
     print(f"\n✓ Generated: {OUTPUT_PATH}")
+    print(f"✓ Generated: {js_path}")
 
     # Generate RSS feed
     generate_rss(discography, all_tracks)
