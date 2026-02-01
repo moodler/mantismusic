@@ -971,6 +971,10 @@ body::before {
         justify-content: center;
     }
 
+    .single-controls {
+        justify-content: center;
+    }
+
     /* Extra bottom padding for taller mobile player */
     .main {
         padding-bottom: 140px;
@@ -1177,7 +1181,6 @@ body::before {
 .single-controls {
     display: flex;
     align-items: center;
-    justify-content: center;
     gap: 1rem;
     padding: 1.5rem 0;
 }
