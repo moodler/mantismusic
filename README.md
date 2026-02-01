@@ -4,7 +4,7 @@ A self-hosted, Spotify-style artist discography player. Manage your music as sim
 
 ## Demo 
 
-See my site at https://mantisaudiogram.music 
+See a demo site by Mantis Audiogram at https://mantisaudiogram.music 
 
 ## Quickstart
 
