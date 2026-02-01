@@ -36,7 +36,6 @@ python3 admin.py
 # Open http://localhost:5001
 ```
 
-On macOS you can also double-click `MantisMusic.command` to launch the admin UI and open it in your browser automatically.
 
 ## How It Works
 
@@ -281,7 +280,6 @@ mantismusic/
 ├── admin.py                # Flask admin UI
 ├── mantis_app.py           # Native macOS app wrapper (pywebview)
 ├── build_app.sh            # Build script for macOS .app
-├── MantisMusic.command     # Double-click launcher for admin UI (macOS)
 ├── templates/              # Admin UI HTML templates (Jinja2)
 ├── config.json             # Settings and API credentials (gitignored)
 ├── config.example.json     # Settings template
