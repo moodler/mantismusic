@@ -701,6 +701,17 @@ def run_build():
                        returncode=-1)
 
 
+@app.route('/api/preview', methods=['POST'])
+def run_preview():
+    """Open the built site in the default browser via file:// URL."""
+    import webbrowser
+    # Use the build-generated index.html if available, otherwise the source
+    generated = DATA_OUTPUT_DIR / 'index.html'
+    target = generated if generated.exists() else INDEX_HTML
+    webbrowser.open(f'file://{target}')
+    return jsonify(ok=True)
+
+
 @app.route('/api/deploy', methods=['POST'])
 def run_deploy():
     if not CONFIG_PATH.exists():

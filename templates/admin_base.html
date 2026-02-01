@@ -798,7 +798,7 @@
             </a>
         </div>
         <div class="sidebar-footer">
-            <button class="build-btn" onclick="runBuild()" id="build-btn">Build JSON</button>
+            <button class="build-btn" onclick="runPreview()" id="build-btn">Preview</button>
             <button class="deploy-btn" onclick="runDeploy()" id="deploy-btn">Deploy to Server</button>
         </div>
     </nav>
@@ -832,8 +832,8 @@
             }, 3000);
         }
 
-        // Build
-        async function runBuild() {
+        // Preview: build then open in browser
+        async function runPreview() {
             const btn = document.getElementById('build-btn');
             const panel = document.getElementById('build-panel');
             const output = document.getElementById('build-output');
@@ -850,8 +850,13 @@
                 let html = '';
                 if (data.stdout) html += data.stdout;
                 if (data.stderr) html += `<span class="error">${escapeHtml(data.stderr)}</span>`;
-                if (data.ok) html += '\n<span class="success">Build completed successfully.</span>';
-                else html += '\n<span class="error">Build failed (exit code ' + data.returncode + ')</span>';
+                if (data.ok) {
+                    html += '\n<span class="success">Build completed. Opening preview...</span>';
+                    // Open the site in the default browser
+                    fetch('/api/preview', { method: 'POST' });
+                } else {
+                    html += '\n<span class="error">Build failed (exit code ' + data.returncode + ')</span>';
+                }
 
                 output.innerHTML = html;
                 showToast(data.ok ? 'Build successful' : 'Build failed', data.ok ? 'success' : 'error');
@@ -861,7 +866,7 @@
             }
 
             btn.classList.remove('building');
-            btn.textContent = 'Build JSON';
+            btn.textContent = 'Preview';
         }
 
         async function runDeploy() {
