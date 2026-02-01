@@ -13,6 +13,13 @@ rm -rf build dist *.spec
 
 # Convert icon if needed (accepts .icns, .png, or .jpg)
 ICON_FLAG=""
+if [ -f "icon.png" ] || [ -f "icon.jpg" ]; then
+    # Always reconvert if source is newer than .icns
+    SRC_ICON=$(ls icon.png icon.jpg 2>/dev/null | head -1)
+    if [ ! -f "icon.icns" ] || [ "$SRC_ICON" -nt "icon.icns" ]; then
+        rm -f icon.icns
+    fi
+fi
 if [ -f "icon.icns" ]; then
     ICON_FLAG="--icon icon.icns"
 elif [ -f "icon.png" ] || [ -f "icon.jpg" ]; then
