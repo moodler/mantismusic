@@ -46,6 +46,7 @@ Usage:
 """
 
 import base64
+import hashlib
 import json
 import os
 import re
@@ -1008,6 +1009,18 @@ def generate_index_html(discography):
     source_html = INDEX_HTML.read_text(encoding='utf-8')
     source_html = _re.sub(r'<title>[^<]*</title>', f'<title>{escape(title)}</title>', source_html)
     source_html = _re.sub(r'(rel="alternate"[^>]*title=")[^"]*(")', rf'\g<1>{escape(title)}\2', source_html)
+
+    # Cache-busting: append content hash to JS and CSS references
+    for asset_rel in ['js/app.js', 'css/style.css', 'data/discography.js']:
+        asset_path = DATA_DIR / asset_rel if asset_rel.startswith('data/') else APP_DIR / asset_rel
+        if asset_path.exists():
+            content_hash = hashlib.md5(asset_path.read_bytes()).hexdigest()[:8]
+            # Strip any existing query string, then add new hash
+            source_html = _re.sub(
+                rf'({_re.escape(asset_rel)})(\?[^"\']*)?',
+                rf'\1?v={content_hash}',
+                source_html
+            )
 
     # Write updated root index.html
     INDEX_HTML.write_text(source_html, encoding='utf-8')
