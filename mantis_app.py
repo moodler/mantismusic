@@ -73,23 +73,25 @@ def save_prefs(prefs):
 def validate_data_dir(path):
     """Check if a directory looks like a Mantis Music data directory."""
     p = Path(path)
-    return (p / 'music').is_dir() or (p / 'config.json').exists()
+    # DATA_DIR IS the music folder with tracks/, collections/, or artist/ at root
+    return ((p / 'tracks').is_dir() or (p / 'collections').is_dir() or
+            (p / 'artist').is_dir() or (p / 'config.json').exists())
 
 
 def initialize_data_dir(path):
     """Create the data directory structure for first-time use."""
     p = Path(path)
-    (p / 'music' / 'artist').mkdir(parents=True, exist_ok=True)
-    (p / 'music' / 'tracks').mkdir(parents=True, exist_ok=True)
-    (p / 'music' / 'collections').mkdir(parents=True, exist_ok=True)
-    (p / 'data').mkdir(parents=True, exist_ok=True)
-    (p / 'feed').mkdir(parents=True, exist_ok=True)
+    # DATA_DIR IS the music folder - create content folders at root
+    (p / 'artist').mkdir(parents=True, exist_ok=True)
+    (p / 'tracks').mkdir(parents=True, exist_ok=True)
+    (p / 'collections').mkdir(parents=True, exist_ok=True)
+    (p / 'preview').mkdir(parents=True, exist_ok=True)
 
     config_path = p / 'config.json'
     if not config_path.exists():
         config_path.write_text(json.dumps(DEFAULT_CONFIG, indent=2) + '\n')
 
-    artist_md = p / 'music' / 'artist' / 'artist.md'
+    artist_md = p / 'artist' / 'artist.md'
     if not artist_md.exists():
         artist_md.write_text(DEFAULT_ARTIST_MD.lstrip())
 

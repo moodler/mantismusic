@@ -907,7 +907,7 @@ async function loadDiscography() {
         if (window._discographyData) {
             discographyData = window._discographyData;
         } else {
-            const response = await fetch('data/discography.json');
+            const response = await fetch('discography.json');
             discographyData = await response.json();
         }
         filteredAlbums = discographyData.albums;

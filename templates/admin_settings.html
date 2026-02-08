@@ -21,9 +21,14 @@
 
         <div class="form-group">
             <label>Data Directory</label>
-            <input type="text" class="form-input" id="field-data-dir"
-                   value="{{ data_dir }}" readonly
-                   style="opacity: 0.7; cursor: default;">
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <input type="text" class="form-input" id="field-data-dir"
+                       value="{{ data_dir }}" readonly
+                       style="opacity: 0.7; cursor: default; flex: 1;">
+                {% if is_bundled_app %}
+                <button class="btn" onclick="resetDataDir()" title="Choose a different data directory">Reset</button>
+                {% endif %}
+            </div>
             <small style="color: var(--text-muted); display: block; margin-top: 4px;">
                 The directory containing music files, config, and generated output.
             </small>
@@ -86,6 +91,23 @@
 
 {% block scripts %}
 <script>
+    async function resetDataDir() {
+        if (!confirm('This will clear the saved data directory. You will need to quit and reopen the app to choose a new location.\n\nContinue?')) {
+            return;
+        }
+        try {
+            const resp = await fetch('/api/reset-data-dir', { method: 'POST' });
+            const result = await resp.json();
+            if (result.ok) {
+                alert('Data directory preference cleared.\n\nPlease quit the app (Cmd+Q) and reopen it to choose a new data directory.');
+            } else {
+                showToast(result.error || 'Failed to reset', 'error');
+            }
+        } catch (e) {
+            showToast('Error: ' + e.message, 'error');
+        }
+    }
+
     async function saveSettings() {
         const data = {
             site_title: document.getElementById('field-site-title').value,

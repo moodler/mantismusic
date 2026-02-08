@@ -32,13 +32,15 @@ import json
 import os
 import re
 import subprocess
+import sys
 import yaml
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify, send_from_directory, Response
 
 from paths import (APP_DIR, DATA_DIR, TEMPLATES_DIR, JS_DIR, CSS_DIR, INDEX_HTML,
-                   BUILD_SCRIPT, MUSIC_DIR, TRACKS_DIR, COLLECTIONS_DIR, ARTIST_DIR,
-                   CONFIG_PATH, DATA_OUTPUT_DIR, OUTPUT_PATH, RSS_PATH, FEED_PAGES_DIR)
+                   BUILD_SCRIPT, TRACKS_DIR, COLLECTIONS_DIR, ARTIST_DIR,
+                   CONFIG_PATH, DATA_OUTPUT_DIR, OUTPUT_PATH, RSS_PATH, FEED_PAGES_DIR,
+                   PREVIEW_DIR)
 
 app = Flask(__name__, template_folder=str(TEMPLATES_DIR))
 
@@ -691,33 +693,52 @@ def upload_artist_banner():
     return jsonify(ok=True, url=f'/music/artist/{dest.name}')
 
 
+def run_build_script():
+    """Run the build script and capture output. Returns (ok, stdout, stderr)."""
+    import io
+    from contextlib import redirect_stdout, redirect_stderr
+
+    # Import the build module
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("build_music_json", BUILD_SCRIPT)
+    build_module = importlib.util.module_from_spec(spec)
+
+    stdout_capture = io.StringIO()
+    stderr_capture = io.StringIO()
+
+    try:
+        with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
+            spec.loader.exec_module(build_module)
+            build_module.main()
+        return True, stdout_capture.getvalue(), stderr_capture.getvalue()
+    except SystemExit as e:
+        # Build script calls sys.exit() on error
+        ok = e.code == 0 or e.code is None
+        return ok, stdout_capture.getvalue(), stderr_capture.getvalue()
+    except Exception as e:
+        return False, stdout_capture.getvalue(), f"{stderr_capture.getvalue()}\n{str(e)}"
+
+
 @app.route('/api/build', methods=['POST'])
 def run_build():
     try:
-        env = os.environ.copy()
-        env['MANTIS_DATA_DIR'] = str(DATA_DIR)
-        env['PYTHONPATH'] = str(APP_DIR) + os.pathsep + env.get('PYTHONPATH', '')
-        result = subprocess.run(
-            ['python3', str(BUILD_SCRIPT)],
-            capture_output=True, text=True, cwd=str(DATA_DIR), timeout=30,
-            env=env
-        )
+        ok, stdout, stderr = run_build_script()
         return jsonify(
-            ok=result.returncode == 0,
-            stdout=result.stdout,
-            stderr=result.stderr,
-            returncode=result.returncode
+            ok=ok,
+            stdout=stdout,
+            stderr=stderr,
+            returncode=0 if ok else 1
         )
-    except subprocess.TimeoutExpired:
-        return jsonify(ok=False, stdout='', stderr='Build timed out after 30s',
-                       returncode=-1)
+    except Exception as e:
+        return jsonify(ok=False, stdout='', stderr=str(e), returncode=-1)
 
 
 @app.route('/api/preview', methods=['POST'])
 def run_preview():
     """Open the built site in the default browser via file:// URL."""
     import webbrowser
-    webbrowser.open(f'file://{INDEX_HTML}')
+    preview_index = PREVIEW_DIR / 'index.html'
+    webbrowser.open(f'file://{preview_index}')
     return jsonify(ok=True)
 
 
@@ -738,25 +759,14 @@ def run_deploy():
                        stderr='Deploy destination not configured.\n\nAdd to config.json:\n  "deploy": {\n    "destination": "user@host:/path/to/site/"\n  }',
                        returncode=-1)
 
-    deployignore = DATA_DIR / '.deployignore'
+    # The preview directory is self-contained with a music symlink to parent
+    # Use --copy-links to follow symlinks and copy actual music files
     cmd = [
-        'rsync', '-avz', '--delete', '--progress',
+        'rsync', '-avz', '--delete', '--progress', '--copy-links',
         '-e', 'ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes',
-    ]
-    if deployignore.exists():
-        cmd += ['--exclude-from', str(deployignore)]
-    # Use build-generated index.html (has OG tags) if available, else source
-    generated_index = DATA_OUTPUT_DIR / 'index.html'
-    index_to_deploy = str(generated_index) if generated_index.exists() else str(INDEX_HTML)
-    # App code assets from APP_DIR, user data from DATA_DIR
-    cmd += [
-        index_to_deploy,
-        str(JS_DIR),
-        str(CSS_DIR),
-        str(RSS_PATH),
-        str(FEED_PAGES_DIR),
-        str(DATA_OUTPUT_DIR),
-        str(MUSIC_DIR),
+        '--exclude', 'raw-*',  # Exclude high-res originals
+        '--exclude', '.DS_Store',
+        str(PREVIEW_DIR) + '/',
         destination
     ]
 
@@ -766,21 +776,14 @@ def run_deploy():
     def stream():
         try:
             # Run build first
-            env = os.environ.copy()
-            env['MANTIS_DATA_DIR'] = str(DATA_DIR)
-            env['PYTHONPATH'] = str(APP_DIR) + os.pathsep + env.get('PYTHONPATH', '')
             yield f"data: {json.dumps({'line': 'Building discography.json...'})}\n\n"
-            build = subprocess.run(
-                ['python3', str(BUILD_SCRIPT)],
-                capture_output=True, text=True, cwd=str(DATA_DIR), timeout=30,
-                env=env
-            )
-            if build.stdout:
-                for bline in build.stdout.strip().splitlines():
+            ok, stdout, stderr = run_build_script()
+            if stdout:
+                for bline in stdout.strip().splitlines():
                     yield f"data: {json.dumps({'line': bline})}\n\n"
-            if build.returncode != 0:
-                stderr = build.stderr or 'Build failed'
-                yield f"data: {json.dumps({'done': True, 'ok': False, 'returncode': build.returncode, 'stderr': stderr})}\n\n"
+            if not ok:
+                stderr = stderr or 'Build failed'
+                yield f"data: {json.dumps({'done': True, 'ok': False, 'returncode': 1, 'stderr': stderr})}\n\n"
                 return
             yield f"data: {json.dumps({'line': ''})}\n\n"
             yield f"data: {json.dumps({'line': 'Deploying via rsync...'})}\n\n"
@@ -824,6 +827,7 @@ def health_api():
 
 @app.route('/settings')
 def settings_page():
+    import sys
     config = {}
     if CONFIG_PATH.exists():
         try:
@@ -833,6 +837,7 @@ def settings_page():
     deploy = config.get('deploy', {})
     return render_template('admin_settings.html',
                            data_dir=str(DATA_DIR),
+                           is_bundled_app=getattr(sys, 'frozen', False),
                            site_title=config.get('site_title', ''),
                            site_url=config.get('site_url', ''),
                            deploy_destination=deploy.get('destination', ''),
@@ -871,6 +876,28 @@ def settings_api():
         return jsonify(ok=False, error=str(e))
 
 
+@app.route('/api/reset-data-dir', methods=['POST'])
+def reset_data_dir_api():
+    """Clear the saved data directory preference so the app prompts on next launch."""
+    import sys
+    # Only available when running as bundled .app
+    if not getattr(sys, 'frozen', False):
+        return jsonify(ok=False, error='Reset is only available in the bundled app')
+
+    prefs_file = Path.home() / 'Library' / 'Application Support' / 'Mantis Music' / 'preferences.json'
+    if not prefs_file.exists():
+        return jsonify(ok=False, error='No preferences file found')
+
+    try:
+        prefs = json.loads(prefs_file.read_text())
+        if 'data_dir' in prefs:
+            del prefs['data_dir']
+            prefs_file.write_text(json.dumps(prefs, indent=2))
+        return jsonify(ok=True)
+    except Exception as e:
+        return jsonify(ok=False, error=str(e))
+
+
 # ---------------------------------------------------------------------------
 # Static file routes (serve bundled app assets and user data)
 # ---------------------------------------------------------------------------
@@ -903,7 +930,8 @@ def serve_feed_pages(filename):
 
 @app.route('/music/<path:filename>')
 def serve_music(filename):
-    return send_from_directory(str(MUSIC_DIR), filename)
+    # DATA_DIR IS the music folder now
+    return send_from_directory(str(DATA_DIR), filename)
 
 
 if __name__ == '__main__':

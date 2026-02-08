@@ -65,13 +65,15 @@ CSS_DIR = APP_DIR / 'css'
 INDEX_HTML = APP_DIR / 'index.html'
 BUILD_SCRIPT = APP_DIR / 'build_music_json.py'
 
-# User data paths
-MUSIC_DIR = DATA_DIR / 'music'
-TRACKS_DIR = MUSIC_DIR / 'tracks'
-COLLECTIONS_DIR = MUSIC_DIR / 'collections'
-ARTIST_DIR = MUSIC_DIR / 'artist'
+# User data paths (DATA_DIR IS the music folder)
+TRACKS_DIR = DATA_DIR / 'tracks'
+COLLECTIONS_DIR = DATA_DIR / 'collections'
+ARTIST_DIR = DATA_DIR / 'artist'
 CONFIG_PATH = DATA_DIR / 'config.json'
-DATA_OUTPUT_DIR = DATA_DIR / 'data'
-OUTPUT_PATH = DATA_OUTPUT_DIR / 'discography.json'
-RSS_PATH = DATA_DIR / 'feed.rss'
-FEED_PAGES_DIR = DATA_DIR / 'feed'
+
+# Preview directory (self-contained deployable output)
+PREVIEW_DIR = DATA_DIR / 'preview'
+DATA_OUTPUT_DIR = PREVIEW_DIR  # Alias for backwards compatibility
+OUTPUT_PATH = PREVIEW_DIR / 'discography.json'
+RSS_PATH = PREVIEW_DIR / 'feed.rss'
+FEED_PAGES_DIR = PREVIEW_DIR / 'feed'

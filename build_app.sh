@@ -51,6 +51,7 @@ pyinstaller \
     --osx-bundle-identifier "music.mantisaudiogram.admin" \
     --hidden-import yaml \
     --hidden-import requests \
+    --hidden-import mutagen \
     --hidden-import paths \
     --noconfirm \
     $ICON_FLAG \

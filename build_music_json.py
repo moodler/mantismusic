@@ -61,9 +61,9 @@ from html import escape
 from xml.sax.saxutils import escape as xml_escape
 
 
-from paths import (APP_DIR, DATA_DIR, MUSIC_DIR, TRACKS_DIR, COLLECTIONS_DIR,
+from paths import (APP_DIR, DATA_DIR, TRACKS_DIR, COLLECTIONS_DIR,
                     ARTIST_DIR, INDEX_HTML, OUTPUT_PATH, RSS_PATH,
-                    FEED_PAGES_DIR, CONFIG_PATH, DATA_OUTPUT_DIR)
+                    FEED_PAGES_DIR, CONFIG_PATH, DATA_OUTPUT_DIR, PREVIEW_DIR)
 
 # BASE_DIR is used for relative asset path computation in build_asset_path()
 BASE_DIR = DATA_DIR
@@ -235,15 +235,17 @@ def optimize_image(image_path):
 
 def build_asset_path(local_path, asset_type):
     """Convert local path to web-accessible path."""
-    rel_path = local_path.relative_to(BASE_DIR)
+    rel_path = local_path.relative_to(DATA_DIR)
+    # Prefix with 'music/' so paths work through the preview/music symlink
+    web_path = f"music/{rel_path}"
     if BASE_URL:
-        return f"{BASE_URL.rstrip('/')}/{rel_path}"
-    return str(rel_path)
+        return f"{BASE_URL.rstrip('/')}/{web_path}"
+    return web_path
 
 
 def parse_artist():
     """Parse artist.md and return artist data."""
-    artist_md = MUSIC_DIR / "artist" / "artist.md"
+    artist_md = ARTIST_DIR / "artist.md"
     frontmatter, bio = read_md_file(artist_md)
 
     social_links = {}
@@ -978,8 +980,36 @@ pre {{ white-space: pre-wrap; color: #ccc; line-height: 1.6; }}
     print(f"  Feed pages: {FEED_PAGES_DIR}/ ({len(feed_items)} pages)")
 
 
+def prepare_preview_dir():
+    """Prepare the preview directory with app assets and music symlink."""
+    import shutil
+
+    # Ensure preview directory exists
+    PREVIEW_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Copy js/ directory from APP_DIR
+    dest_js = PREVIEW_DIR / 'js'
+    if dest_js.exists():
+        shutil.rmtree(dest_js)
+    shutil.copytree(APP_DIR / 'js', dest_js)
+
+    # Copy css/ directory from APP_DIR
+    dest_css = PREVIEW_DIR / 'css'
+    if dest_css.exists():
+        shutil.rmtree(dest_css)
+    shutil.copytree(APP_DIR / 'css', dest_css)
+
+    # Create music symlink pointing to parent (DATA_DIR)
+    music_link = PREVIEW_DIR / 'music'
+    if music_link.exists() or music_link.is_symlink():
+        music_link.unlink()
+    music_link.symlink_to('..')
+
+    print(f"✓ Prepared preview directory: {PREVIEW_DIR}")
+
+
 def generate_index_html(discography):
-    """Generate data/index.html with OpenGraph meta tags and favicon."""
+    """Generate preview/index.html with OpenGraph meta tags and favicon."""
     import shutil
 
     artist = discography['artist']
@@ -990,29 +1020,32 @@ def generate_index_html(discography):
     if len(bio) > 200:
         og_desc += '...'
 
-    # Copy artist profile image to data/og-image.jpg for a stable OG image URL
+    # Copy artist profile image to preview/og-image.jpg for a stable OG image URL
     profile_img = find_file(ARTIST_DIR, ['.jpg', '.jpeg', '.png', '.gif', '.webp'])
     og_image_path = ''
     og_image_url = ''
     if profile_img:
         optimize_image(profile_img)
         ext = profile_img.suffix
-        dest = DATA_OUTPUT_DIR / f"og-image{ext}"
+        dest = PREVIEW_DIR / f"og-image{ext}"
         shutil.copy2(str(profile_img), str(dest))
-        og_image_path = f"data/og-image{ext}"
+        og_image_path = f"og-image{ext}"
         if SITE_URL:
             og_image_url = f"{SITE_URL}/{og_image_path}"
 
     import re as _re
 
-    # Read source index.html and replace hardcoded titles with configured values
+    # Read source index.html template
     source_html = INDEX_HTML.read_text(encoding='utf-8')
+
+    # Replace hardcoded titles with configured values
     source_html = _re.sub(r'<title>[^<]*</title>', f'<title>{escape(title)}</title>', source_html)
     source_html = _re.sub(r'(rel="alternate"[^>]*title=")[^"]*(")', rf'\g<1>{escape(title)}\2', source_html)
 
-    # Cache-busting: append content hash to JS and CSS references
-    for asset_rel in ['js/app.js', 'css/style.css', 'data/discography.js']:
-        asset_path = DATA_DIR / asset_rel if asset_rel.startswith('data/') else APP_DIR / asset_rel
+    # Cache-busting: append content hash to JS, CSS, and discography.js references
+    # All assets are now in PREVIEW_DIR
+    for asset_rel in ['js/app.js', 'css/style.css', 'discography.js']:
+        asset_path = PREVIEW_DIR / asset_rel
         if asset_path.exists():
             content_hash = hashlib.md5(asset_path.read_bytes()).hexdigest()[:8]
             # Strip any existing query string, then add new hash
@@ -1022,11 +1055,7 @@ def generate_index_html(discography):
                 source_html
             )
 
-    # Write updated root index.html
-    INDEX_HTML.write_text(source_html, encoding='utf-8')
-    print(f"✓ Updated: {INDEX_HTML}")
-
-    # Build OG meta tags for the deploy version
+    # Build OG meta tags
     og_tags = []
     og_tags.append(f'    <meta property="og:type" content="website">')
     og_tags.append(f'    <meta property="og:title" content="{escape(title)}">')
@@ -1049,15 +1078,15 @@ def generate_index_html(discography):
 
     og_block = '\n'.join(og_tags) + '\n'
 
-    # Inject OG tags into a copy for deployment
-    deploy_html = source_html.replace(
+    # Inject OG tags before title
+    output_html = source_html.replace(
         '    <title>',
         og_block + '    <title>'
     )
 
-    # Write to data/index.html (for deploy)
-    output_path = DATA_OUTPUT_DIR / 'index.html'
-    output_path.write_text(deploy_html, encoding='utf-8')
+    # Write to preview/index.html
+    output_path = PREVIEW_DIR / 'index.html'
+    output_path.write_text(output_html, encoding='utf-8')
     print(f"✓ Generated: {output_path}")
 
 
@@ -1081,11 +1110,11 @@ def main():
         except Exception:
             pass
 
-    if not MUSIC_DIR.exists():
-        print(f"ERROR: Music directory not found: {MUSIC_DIR}")
+    if not TRACKS_DIR.exists() and not COLLECTIONS_DIR.exists():
+        print(f"ERROR: Music directory not found (no tracks/ or collections/): {DATA_DIR}")
         sys.exit(1)
 
-    print(f"Building discography from: {MUSIC_DIR}")
+    print(f"Building discography from: {DATA_DIR}")
 
     # Get API tokens once for all lookups
     spotify_token = get_spotify_token()
@@ -1202,6 +1231,9 @@ def main():
         'albums': albums,
         'singles': singles
     }
+
+    # Prepare preview directory with app assets and music symlink
+    prepare_preview_dir()
 
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
 
