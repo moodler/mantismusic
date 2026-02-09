@@ -47,12 +47,14 @@ pyinstaller \
     --add-data "css:css" \
     --add-data "index.html:." \
     --add-data "paths.py:." \
+    --add-data "admin.py:." \
     --add-data "build_music_json.py:." \
     --osx-bundle-identifier "music.mantisaudiogram.admin" \
     --hidden-import yaml \
     --hidden-import requests \
     --hidden-import mutagen \
     --hidden-import paths \
+    --hidden-import admin \
     --noconfirm \
     $ICON_FLAG \
     mantis_app.py

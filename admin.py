@@ -843,7 +843,8 @@ def run_deploy():
                 # Check if we should retry
                 if result['returncode'] in retryable_codes and attempt < max_retries:
                     import time
-                    yield f"data: {json.dumps({'line': f'Rsync failed (code {result[\"returncode\"]}), waiting 5s before retry...'})}\n\n"
+                    rc = result['returncode']
+                    yield f"data: {json.dumps({'line': f'Rsync failed (code {rc}), waiting 5s before retry...'})}\n\n"
                     time.sleep(5)
                     continue
 

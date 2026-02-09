@@ -235,6 +235,7 @@ function initializeAudioPlayer() {
     document.getElementById('next-btn').addEventListener('click', playNext);
 
     // Media Session API for lock screen, CarPlay, etc.
+    // iOS shows seek buttons instead of prev/next - make them skip tracks
     if ('mediaSession' in navigator) {
         navigator.mediaSession.setActionHandler('play', () => {
             audioPlayer.play();
@@ -248,6 +249,8 @@ function initializeAudioPlayer() {
         });
         navigator.mediaSession.setActionHandler('previoustrack', playPrevious);
         navigator.mediaSession.setActionHandler('nexttrack', playNext);
+        navigator.mediaSession.setActionHandler('seekbackward', playPrevious);
+        navigator.mediaSession.setActionHandler('seekforward', playNext);
     }
 
     // Progress bar
@@ -362,6 +365,19 @@ function updateProgress() {
     const progress = (audioPlayer.currentTime / audioPlayer.duration) * 100;
     document.getElementById('progress-fill').style.width = `${progress}%`;
     document.getElementById('current-time').textContent = formatTime(audioPlayer.currentTime);
+
+    // Update Media Session position state (throttled to every 5 seconds)
+    if ('mediaSession' in navigator && audioPlayer.duration &&
+        (!updateProgress.lastUpdate || Date.now() - updateProgress.lastUpdate > 5000)) {
+        updateProgress.lastUpdate = Date.now();
+        try {
+            navigator.mediaSession.setPositionState({
+                duration: audioPlayer.duration,
+                playbackRate: audioPlayer.playbackRate,
+                position: audioPlayer.currentTime
+            });
+        } catch (e) {}
+    }
 }
 
 // Update duration display
