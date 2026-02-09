@@ -51,7 +51,7 @@ body::before {
     left: 0;
     right: 0;
     bottom: 0;
-    background-image: url('../music/artist/banner.png');
+    background-image: url('../../artist/banner.png');
     background-size: cover;
     background-position: center;
     background-attachment: fixed;
@@ -157,7 +157,7 @@ body::before {
 .hero-section {
     position: relative;
     height: 340px;
-    background-image: url('../music/artist/banner.png');
+    background-image: url('../../artist/banner.png');
     background-size: cover;
     background-position: center;
     overflow: hidden;

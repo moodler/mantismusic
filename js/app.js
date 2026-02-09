@@ -234,6 +234,22 @@ function initializeAudioPlayer() {
     document.getElementById('prev-btn').addEventListener('click', playPrevious);
     document.getElementById('next-btn').addEventListener('click', playNext);
 
+    // Media Session API for lock screen, CarPlay, etc.
+    if ('mediaSession' in navigator) {
+        navigator.mediaSession.setActionHandler('play', () => {
+            audioPlayer.play();
+            isPlaying = true;
+            updatePlayPauseButton();
+        });
+        navigator.mediaSession.setActionHandler('pause', () => {
+            audioPlayer.pause();
+            isPlaying = false;
+            updatePlayPauseButton();
+        });
+        navigator.mediaSession.setActionHandler('previoustrack', playPrevious);
+        navigator.mediaSession.setActionHandler('nexttrack', playNext);
+    }
+
     // Progress bar
     const progressBar = document.getElementById('progress-bar');
     progressBar.addEventListener('click', seekTo);
@@ -575,19 +591,19 @@ function renderQueueList() {
         const upBtn = document.createElement('button');
         upBtn.className = 'queue-control-btn';
         upBtn.textContent = '↑';
-        upBtn.onclick = () => moveQueueItemUp(index);
+        upBtn.onclick = (e) => { e.stopPropagation(); moveQueueItemUp(index); };
         upBtn.disabled = index === 0;
 
         const downBtn = document.createElement('button');
         downBtn.className = 'queue-control-btn';
         downBtn.textContent = '↓';
-        downBtn.onclick = () => moveQueueItemDown(index);
+        downBtn.onclick = (e) => { e.stopPropagation(); moveQueueItemDown(index); };
         downBtn.disabled = index === queue.length - 1;
 
         const removeBtn = document.createElement('button');
         removeBtn.className = 'queue-control-btn remove';
         removeBtn.textContent = '×';
-        removeBtn.onclick = () => removeFromQueue(index);
+        removeBtn.onclick = (e) => { e.stopPropagation(); removeFromQueue(index); };
 
         controls.appendChild(upBtn);
         controls.appendChild(downBtn);
@@ -676,7 +692,7 @@ function updatePlayerUI() {
         playerCover.style.backgroundPosition = 'center';
         playerCover.textContent = '';
     } else {
-        playerCover.style.backgroundImage = 'url(music/artist/profile.jpg)';
+        playerCover.style.backgroundImage = 'url(artist/profile.jpg)';
         playerCover.style.backgroundSize = 'cover';
         playerCover.style.backgroundPosition = 'center';
         playerCover.textContent = '';
@@ -715,6 +731,33 @@ function updatePlayerUI() {
     };
     playerCover.onclick = goToTrack;
     playerTitle.onclick = goToTrack;
+
+    // Update Media Session for lock screen, CarPlay, etc.
+    updateMediaSession();
+}
+
+// Update Media Session metadata for lock screen, CarPlay, etc.
+function updateMediaSession() {
+    if (!('mediaSession' in navigator) || !currentTrack) return;
+
+    const coverArt = currentTrack.coverArt || currentRelease.coverArt;
+    const artworkUrl = coverArt
+        ? resolveDataUrl(coverArt)
+        : 'artist/profile.jpg';
+
+    // Convert relative URL to absolute for Media Session
+    const absoluteArtwork = new URL(artworkUrl, window.location.href).href;
+
+    const isSingle = !currentRelease.tracks;
+
+    navigator.mediaSession.metadata = new MediaMetadata({
+        title: currentTrack.title,
+        artist: discographyData.artist,
+        album: isSingle ? '' : currentRelease.title,
+        artwork: [
+            { src: absoluteArtwork, sizes: '512x512', type: 'image/jpeg' }
+        ]
+    });
 }
 
 // Extract two dominant color clusters from the profile image and apply
@@ -802,7 +845,7 @@ function applyBrandColors() {
             el.style.backgroundClip = 'text';
         });
     };
-    img.src = 'music/artist/profile.jpg';
+    img.src = 'artist/profile.jpg';
 }
 
 // Extract dominant color from an image and apply gradient to an element
@@ -907,7 +950,7 @@ async function loadDiscography() {
         if (window._discographyData) {
             discographyData = window._discographyData;
         } else {
-            const response = await fetch('discography.json');
+            const response = await fetch('site/discography.json');
             discographyData = await response.json();
         }
         filteredAlbums = discographyData.albums;
@@ -1207,12 +1250,12 @@ function renderAbout() {
     if (!document.querySelector('.about-banner')) {
         const banner = document.createElement('div');
         banner.className = 'about-banner';
-        banner.style.backgroundImage = 'url(music/artist/banner.png)';
+        banner.style.backgroundImage = 'url(artist/banner.png)';
         aboutContent.insertBefore(banner, aboutContent.firstChild);
 
         const profile = document.createElement('img');
         profile.className = 'about-profile';
-        profile.src = 'music/artist/profile.jpg';
+        profile.src = 'artist/profile.jpg';
         profile.alt = 'Mantis Audiogram';
         banner.insertAdjacentElement('afterend', profile);
     }

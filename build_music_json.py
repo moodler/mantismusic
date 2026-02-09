@@ -63,7 +63,7 @@ from xml.sax.saxutils import escape as xml_escape
 
 from paths import (APP_DIR, DATA_DIR, TRACKS_DIR, COLLECTIONS_DIR,
                     ARTIST_DIR, INDEX_HTML, OUTPUT_PATH, RSS_PATH,
-                    FEED_PAGES_DIR, CONFIG_PATH, DATA_OUTPUT_DIR, PREVIEW_DIR)
+                    FEED_PAGES_DIR, CONFIG_PATH, DATA_OUTPUT_DIR, SITE_DIR)
 
 # BASE_DIR is used for relative asset path computation in build_asset_path()
 BASE_DIR = DATA_DIR
@@ -236,11 +236,9 @@ def optimize_image(image_path):
 def build_asset_path(local_path, asset_type):
     """Convert local path to web-accessible path."""
     rel_path = local_path.relative_to(DATA_DIR)
-    # Prefix with 'music/' so paths work through the preview/music symlink
-    web_path = f"music/{rel_path}"
     if BASE_URL:
-        return f"{BASE_URL.rstrip('/')}/{web_path}"
-    return web_path
+        return f"{BASE_URL.rstrip('/')}/{rel_path}"
+    return str(rel_path)
 
 
 def parse_artist():
@@ -980,32 +978,26 @@ pre {{ white-space: pre-wrap; color: #ccc; line-height: 1.6; }}
     print(f"  Feed pages: {FEED_PAGES_DIR}/ ({len(feed_items)} pages)")
 
 
-def prepare_preview_dir():
-    """Prepare the preview directory with app assets and music symlink."""
+def prepare_deploy_assets():
+    """Copy app assets (js, css) to site/ directory for deployment."""
     import shutil
 
-    # Ensure preview directory exists
-    PREVIEW_DIR.mkdir(parents=True, exist_ok=True)
+    # Ensure site directory exists
+    SITE_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Copy js/ directory from APP_DIR
-    dest_js = PREVIEW_DIR / 'js'
+    # Copy js/ directory from APP_DIR to site/
+    dest_js = SITE_DIR / 'js'
     if dest_js.exists():
         shutil.rmtree(dest_js)
     shutil.copytree(APP_DIR / 'js', dest_js)
 
-    # Copy css/ directory from APP_DIR
-    dest_css = PREVIEW_DIR / 'css'
+    # Copy css/ directory from APP_DIR to site/
+    dest_css = SITE_DIR / 'css'
     if dest_css.exists():
         shutil.rmtree(dest_css)
     shutil.copytree(APP_DIR / 'css', dest_css)
 
-    # Create music symlink pointing to parent (DATA_DIR)
-    music_link = PREVIEW_DIR / 'music'
-    if music_link.exists() or music_link.is_symlink():
-        music_link.unlink()
-    music_link.symlink_to('..')
-
-    print(f"✓ Prepared preview directory: {PREVIEW_DIR}")
+    print(f"✓ Copied js/ and css/ to {SITE_DIR}")
 
 
 def generate_index_html(discography):
@@ -1020,16 +1012,16 @@ def generate_index_html(discography):
     if len(bio) > 200:
         og_desc += '...'
 
-    # Copy artist profile image to preview/og-image.jpg for a stable OG image URL
+    # Copy artist profile image to site/og-image.jpg for a stable OG image URL
     profile_img = find_file(ARTIST_DIR, ['.jpg', '.jpeg', '.png', '.gif', '.webp'])
     og_image_path = ''
     og_image_url = ''
     if profile_img:
         optimize_image(profile_img)
         ext = profile_img.suffix
-        dest = PREVIEW_DIR / f"og-image{ext}"
+        dest = SITE_DIR / f"og-image{ext}"
         shutil.copy2(str(profile_img), str(dest))
-        og_image_path = f"og-image{ext}"
+        og_image_path = f"site/og-image{ext}"
         if SITE_URL:
             og_image_url = f"{SITE_URL}/{og_image_path}"
 
@@ -1043,9 +1035,9 @@ def generate_index_html(discography):
     source_html = _re.sub(r'(rel="alternate"[^>]*title=")[^"]*(")', rf'\g<1>{escape(title)}\2', source_html)
 
     # Cache-busting: append content hash to JS, CSS, and discography.js references
-    # All assets are now in PREVIEW_DIR
-    for asset_rel in ['js/app.js', 'css/style.css', 'discography.js']:
-        asset_path = PREVIEW_DIR / asset_rel
+    # Assets are in site/ subdirectory
+    for asset_rel in ['site/js/app.js', 'site/css/style.css', 'site/discography.js']:
+        asset_path = DATA_DIR / asset_rel
         if asset_path.exists():
             content_hash = hashlib.md5(asset_path.read_bytes()).hexdigest()[:8]
             # Strip any existing query string, then add new hash
@@ -1084,8 +1076,8 @@ def generate_index_html(discography):
         og_block + '    <title>'
     )
 
-    # Write to preview/index.html
-    output_path = PREVIEW_DIR / 'index.html'
+    # Write index.html to DATA_DIR
+    output_path = DATA_DIR / 'index.html'
     output_path.write_text(output_html, encoding='utf-8')
     print(f"✓ Generated: {output_path}")
 
@@ -1233,7 +1225,7 @@ def main():
     }
 
     # Prepare preview directory with app assets and music symlink
-    prepare_preview_dir()
+    prepare_deploy_assets()
 
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
 

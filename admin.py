@@ -40,7 +40,7 @@ from flask import Flask, render_template, request, jsonify, send_from_directory,
 from paths import (APP_DIR, DATA_DIR, TEMPLATES_DIR, JS_DIR, CSS_DIR, INDEX_HTML,
                    BUILD_SCRIPT, TRACKS_DIR, COLLECTIONS_DIR, ARTIST_DIR,
                    CONFIG_PATH, DATA_OUTPUT_DIR, OUTPUT_PATH, RSS_PATH, FEED_PAGES_DIR,
-                   PREVIEW_DIR)
+                   SITE_DIR)
 
 app = Flask(__name__, template_folder=str(TEMPLATES_DIR))
 
@@ -737,7 +737,7 @@ def run_build():
 def run_preview():
     """Open the built site in the default browser via file:// URL."""
     import webbrowser
-    preview_index = PREVIEW_DIR / 'index.html'
+    preview_index = DATA_DIR / 'index.html'
     webbrowser.open(f'file://{preview_index}')
     return jsonify(ok=True)
 
@@ -759,19 +759,54 @@ def run_deploy():
                        stderr='Deploy destination not configured.\n\nAdd to config.json:\n  "deploy": {\n    "destination": "user@host:/path/to/site/"\n  }',
                        returncode=-1)
 
-    # The preview directory is self-contained with a music symlink to parent
-    # Use --copy-links to follow symlinks and copy actual music files
+    # Deploy DATA_DIR directly - it contains both music and generated files
     cmd = [
-        'rsync', '-avz', '--delete', '--progress', '--copy-links',
-        '-e', 'ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes',
+        'rsync', '-avz', '--delete', '--progress',
+        '--partial',  # Keep partial files for resume
+        '--timeout=120',  # I/O timeout (seconds)
+        '-e', 'ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3',
         '--exclude', 'raw-*',  # Exclude high-res originals
         '--exclude', '.DS_Store',
-        str(PREVIEW_DIR) + '/',
+        '--exclude', 'config.json',  # Exclude config with secrets
+        str(DATA_DIR) + '/',
         destination
     ]
 
+    max_retries = 3
+    # Retryable rsync exit codes: 10=socket I/O, 11=file I/O, 12=protocol, 23=partial, 24=vanished, 30=timeout
+    retryable_codes = {10, 11, 12, 23, 24, 30}
+
     # Pattern to match rsync xfer progress: (xfer#N, to-check=M/T)
     xfer_re = re.compile(r'\(xfer#(\d+),\s*to-check=(\d+)/(\d+)\)')
+
+    def run_rsync():
+        """Run rsync and yield progress events. Returns (success, returncode, stderr, files_done)."""
+        proc = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            text=True, cwd=str(DATA_DIR)
+        )
+        files_done = 0
+        total_files = 0
+        current_file = None
+        for line in iter(proc.stdout.readline, ''):
+            line = line.rstrip()
+            # Match transfer completion lines with xfer info
+            m = xfer_re.search(line)
+            if m:
+                files_done = int(m.group(1))
+                remaining = int(m.group(2))
+                total_files = int(m.group(3))
+                pct = round((total_files - remaining) / total_files * 100) if total_files else 0
+                yield 'progress', {'xfer': files_done, 'total': total_files, 'pct': pct, 'file': current_file}
+            # Skip partial progress lines (start with whitespace + numbers)
+            elif line and not line[0].isspace():
+                # Store filename — it will be included in the next xfer event
+                current_file = line
+        proc.stdout.close()
+        stderr = proc.stderr.read()
+        proc.stderr.close()
+        rc = proc.wait()
+        yield 'done', {'ok': rc == 0, 'returncode': rc, 'stderr': stderr, 'files': files_done}
 
     def stream():
         try:
@@ -786,34 +821,36 @@ def run_deploy():
                 yield f"data: {json.dumps({'done': True, 'ok': False, 'returncode': 1, 'stderr': stderr})}\n\n"
                 return
             yield f"data: {json.dumps({'line': ''})}\n\n"
-            yield f"data: {json.dumps({'line': 'Deploying via rsync...'})}\n\n"
 
-            proc = subprocess.Popen(
-                cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                text=True, cwd=str(DATA_DIR)
-            )
-            files_done = 0
-            total_files = 0
-            current_file = None
-            for line in iter(proc.stdout.readline, ''):
-                line = line.rstrip()
-                # Match transfer completion lines with xfer info
-                m = xfer_re.search(line)
-                if m:
-                    files_done = int(m.group(1))
-                    remaining = int(m.group(2))
-                    total_files = int(m.group(3))
-                    pct = round((total_files - remaining) / total_files * 100) if total_files else 0
-                    yield f"data: {json.dumps({'xfer': files_done, 'total': total_files, 'pct': pct, 'file': current_file})}\n\n"
-                # Skip partial progress lines (start with whitespace + numbers)
-                elif line and not line[0].isspace():
-                    # Store filename — it will be included in the next xfer event
-                    current_file = line
-            proc.stdout.close()
-            stderr = proc.stderr.read()
-            proc.stderr.close()
-            rc = proc.wait()
-            yield f"data: {json.dumps({'done': True, 'ok': rc == 0, 'returncode': rc, 'stderr': stderr, 'files': files_done})}\n\n"
+            # Rsync with retries
+            for attempt in range(1, max_retries + 1):
+                if attempt > 1:
+                    yield f"data: {json.dumps({'line': f'Retrying rsync (attempt {attempt}/{max_retries})...'})}\n\n"
+                else:
+                    yield f"data: {json.dumps({'line': 'Deploying via rsync...'})}\n\n"
+
+                result = None
+                for event_type, data in run_rsync():
+                    if event_type == 'progress':
+                        yield f"data: {json.dumps(data)}\n\n"
+                    elif event_type == 'done':
+                        result = data
+
+                if result['ok']:
+                    yield f"data: {json.dumps({'done': True, **result})}\n\n"
+                    return
+
+                # Check if we should retry
+                if result['returncode'] in retryable_codes and attempt < max_retries:
+                    import time
+                    yield f"data: {json.dumps({'line': f'Rsync failed (code {result[\"returncode\"]}), waiting 5s before retry...'})}\n\n"
+                    time.sleep(5)
+                    continue
+
+                # Non-retryable error or max retries reached
+                yield f"data: {json.dumps({'done': True, **result})}\n\n"
+                return
+
         except Exception as e:
             yield f"data: {json.dumps({'done': True, 'ok': False, 'returncode': -1, 'stderr': str(e)})}\n\n"
 
@@ -902,28 +939,36 @@ def reset_data_dir_api():
 # Static file routes (serve bundled app assets and user data)
 # ---------------------------------------------------------------------------
 
-@app.route('/js/<path:filename>')
+@app.route('/site/js/<path:filename>')
 def serve_js(filename):
+    # Serve from SITE_DIR if built, otherwise from APP_DIR source
+    site_js = SITE_DIR / 'js' / filename
+    if site_js.exists():
+        return send_from_directory(str(SITE_DIR / 'js'), filename)
     return send_from_directory(str(JS_DIR), filename)
 
 
-@app.route('/css/<path:filename>')
+@app.route('/site/css/<path:filename>')
 def serve_css(filename):
+    # Serve from SITE_DIR if built, otherwise from APP_DIR source
+    site_css = SITE_DIR / 'css' / filename
+    if site_css.exists():
+        return send_from_directory(str(SITE_DIR / 'css'), filename)
     return send_from_directory(str(CSS_DIR), filename)
 
 
-@app.route('/data/<path:filename>')
-def serve_data(filename):
-    return send_from_directory(str(DATA_OUTPUT_DIR), filename)
+@app.route('/site/<path:filename>')
+def serve_site(filename):
+    return send_from_directory(str(SITE_DIR), filename)
 
 
-@app.route('/feed.rss')
+@app.route('/site/feed.rss')
 def serve_rss():
     return send_from_directory(str(RSS_PATH.parent), RSS_PATH.name,
                                mimetype='application/rss+xml')
 
 
-@app.route('/feed/<path:filename>')
+@app.route('/site/feed/<path:filename>')
 def serve_feed_pages(filename):
     return send_from_directory(str(FEED_PAGES_DIR), filename)
 

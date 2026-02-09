@@ -85,7 +85,6 @@ def initialize_data_dir(path):
     (p / 'artist').mkdir(parents=True, exist_ok=True)
     (p / 'tracks').mkdir(parents=True, exist_ok=True)
     (p / 'collections').mkdir(parents=True, exist_ok=True)
-    (p / 'preview').mkdir(parents=True, exist_ok=True)
 
     config_path = p / 'config.json'
     if not config_path.exists():
