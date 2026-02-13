@@ -1001,7 +1001,7 @@ def prepare_deploy_assets():
 
 
 def generate_index_html(discography):
-    """Generate preview/index.html with OpenGraph meta tags and favicon."""
+    """Generate index.html with OpenGraph meta tags and favicon."""
     import shutil
 
     artist = discography['artist']
