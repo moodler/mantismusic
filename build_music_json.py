@@ -867,7 +867,7 @@ def generate_rss(discography, all_tracks):
         release = item['release']
         title = xml_escape(track.get('title', ''))
         slug = track.get('slug') or track.get('id', '')
-        player_link = f"{SITE_URL}/#/track/{slug}"
+        player_link = f"{SITE_URL}/track/{slug}"
         feed_link = f"{SITE_URL}/feed/{slug}.html"
         description = track.get('description') or release.get('description') or ''
         lyrics = track.get('lyrics', '')
@@ -1082,6 +1082,141 @@ def generate_index_html(discography):
     print(f"✓ Generated: {output_path}")
 
 
+def generate_og_pages(discography):
+    """Generate per-track and per-collection HTML pages with item-specific OG tags.
+
+    Social media crawlers don't execute JavaScript, so sharing a URL like
+    /track/my-song needs a real HTML file with the correct og:title, og:image, etc.
+    Each generated page is a copy of the root index.html with customised meta tags
+    and a <base href> so that relative asset paths still resolve correctly.
+    """
+    if not SITE_URL:
+        print("⚠ Skipping OG pages: site_url not set in config.json")
+        return
+
+    root_html_path = DATA_DIR / 'index.html'
+    if not root_html_path.exists():
+        print("⚠ Skipping OG pages: index.html not found")
+        return
+
+    import shutil
+
+    template = root_html_path.read_text(encoding='utf-8')
+    artist = discography['artist']
+
+    # Clean and create output directories
+    track_dir = DATA_DIR / 'track'
+    collection_dir = DATA_DIR / 'collection'
+    for d in [track_dir, collection_dir]:
+        if d.exists():
+            shutil.rmtree(d)
+        d.mkdir(parents=True)
+
+    count = 0
+
+    def make_og_page(item_type, item_id, title, description, cover_art, og_type):
+        nonlocal count
+
+        og_title = escape(title)
+        desc_text = (description or '').replace('\n', ' ').strip()
+        og_desc = escape(desc_text[:200])
+        if len(desc_text) > 200:
+            og_desc += '...'
+        og_url = f"{SITE_URL}/{item_type}/{item_id}"
+        og_image = f"{SITE_URL}/{cover_art}" if cover_art else ''
+        page_title = f"{title} \u2014 {artist}"
+
+        html = template
+
+        # Replace <title>
+        html = re.sub(r'<title>[^<]*</title>', f'<title>{escape(page_title)}</title>', html)
+
+        # Add <base> tag after charset for correct asset resolution from 2 levels deep
+        html = html.replace(
+            '<meta charset="UTF-8">\n',
+            '<meta charset="UTF-8">\n    <base href="../../">\n',
+            1
+        )
+
+        # Remove all existing og:, twitter:, and meta description tags
+        html = re.sub(r'\s*<meta property="og:[^"]*"[^>]*>', '', html)
+        html = re.sub(r'\s*<meta name="twitter:[^"]*"[^>]*>', '', html)
+        html = re.sub(r'\s*<meta name="description"[^>]*>', '', html)
+
+        # Build new OG tags
+        og_tags = []
+        og_tags.append(f'    <meta property="og:type" content="{og_type}">')
+        og_tags.append(f'    <meta property="og:title" content="{og_title}">')
+        if og_desc:
+            og_tags.append(f'    <meta property="og:description" content="{og_desc}">')
+        og_tags.append(f'    <meta property="og:url" content="{escape(og_url)}">')
+        if og_image:
+            og_tags.append(f'    <meta property="og:image" content="{escape(og_image)}">')
+            og_tags.append(f'    <meta property="og:image:width" content="512">')
+            og_tags.append(f'    <meta property="og:image:height" content="512">')
+        og_tags.append(f'    <meta name="description" content="{og_desc}">')
+        og_tags.append(f'    <meta name="twitter:card" content="summary">')
+        og_tags.append(f'    <meta name="twitter:title" content="{og_title}">')
+        if og_desc:
+            og_tags.append(f'    <meta name="twitter:description" content="{og_desc}">')
+        if og_image:
+            og_tags.append(f'    <meta name="twitter:image" content="{escape(og_image)}">')
+
+        og_block = '\n'.join(og_tags) + '\n'
+
+        # Inject OG tags before <title>
+        html = html.replace('    <title>', og_block + '    <title>')
+
+        # Write the page
+        page_dir = DATA_DIR / item_type / item_id
+        page_dir.mkdir(parents=True, exist_ok=True)
+        (page_dir / 'index.html').write_text(html, encoding='utf-8')
+        count += 1
+
+    # Generate track pages from albums
+    for release in discography['albums']:
+        for track in release.get('tracks', []):
+            slug = track.get('slug', '')
+            if not slug:
+                continue
+            cover = track.get('coverArt') or release.get('coverArt', '')
+            make_og_page('track', slug, track['title'],
+                        track.get('description') or release.get('description', ''),
+                        cover, 'music.song')
+
+    # Singles and EPs
+    for release in discography['singles']:
+        if release.get('tracks'):
+            # EP — generate pages for each track and for the collection
+            for track in release['tracks']:
+                slug = track.get('slug', '')
+                if not slug:
+                    continue
+                cover = track.get('coverArt') or release.get('coverArt', '')
+                make_og_page('track', slug, track['title'],
+                            track.get('description') or release.get('description', ''),
+                            cover, 'music.song')
+            make_og_page('collection', release['id'], release['title'],
+                        release.get('description', ''),
+                        release.get('coverArt', ''), 'music.album')
+        else:
+            # Single — generate track page
+            slug = release.get('id', '')
+            if not slug:
+                continue
+            make_og_page('track', slug, release['title'],
+                        release.get('description', ''),
+                        release.get('coverArt', ''), 'music.song')
+
+    # Collection pages for albums
+    for release in discography['albums']:
+        make_og_page('collection', release['id'], release['title'],
+                    release.get('description', ''),
+                    release.get('coverArt', ''), 'music.album')
+
+    print(f"✓ Generated: {count} OG pages (track/ and collection/)")
+
+
 def main():
     global BASE_URL, SITE_URL, SITE_TITLE
 
@@ -1247,6 +1382,9 @@ def main():
 
     # Generate index.html with OG tags and favicon
     generate_index_html(discography)
+
+    # Generate per-track and per-collection OG pages for social media
+    generate_og_pages(discography)
 
     print(f"  Albums: {len(albums)}")
     print(f"  Singles/EPs: {len(singles)}")

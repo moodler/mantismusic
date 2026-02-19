@@ -95,16 +95,27 @@ function resolveDataUrl(path) {
     return cleanPath;
 }
 
-// Hash routing guard — prevents navigateFromHash from firing
-// when we programmatically set the hash
-let hashChangeFromCode = false;
+// Routing: use History API for http/https, hash routing for file://
+const useHashRouting = window.location.protocol === 'file:';
+let pathChangeFromCode = false;
 
-// Update the URL hash without triggering navigateFromHash
-function updateHash(hash) {
-    hashChangeFromCode = true;
-    window.location.hash = hash;
-    // Reset the guard after the synchronous hashchange fires
-    hashChangeFromCode = false;
+// Update the URL path without triggering navigation
+function updatePath(path) {
+    pathChangeFromCode = true;
+    if (useHashRouting) {
+        window.location.hash = '#' + path;
+    } else {
+        history.pushState(null, '', path);
+    }
+    pathChangeFromCode = false;
+}
+
+// Get the current route path
+function getCurrentPath() {
+    if (useHashRouting) {
+        return window.location.hash.replace(/^#/, '') || '/';
+    }
+    return window.location.pathname || '/';
 }
 
 // Look up a release (album or single) by its id
@@ -131,11 +142,12 @@ function findTrackBySlug(slug) {
     return null;
 }
 
-// Read the current hash and navigate to the matching view
-function navigateFromHash() {
-    const hash = window.location.hash.replace(/^#\/?/, ''); // strip leading #/ or #
+// Read the current path and navigate to the matching view
+function navigateFromPath() {
+    const raw = getCurrentPath();
+    const path = raw.replace(/^\/+/, '').replace(/\/+$/, ''); // strip slashes
 
-    if (!hash) {
+    if (!path || path === 'index.html') {
         currentView = 'tracks';
         navigationHistory = [];
         syncNavButton();
@@ -143,7 +155,7 @@ function navigateFromHash() {
         return;
     }
 
-    const parts = hash.split('/');
+    const parts = path.split('/');
 
     if (parts[0] === 'collections') {
         currentView = 'collections';
@@ -203,15 +215,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     initializeAudioPlayer();
     populateFilters();
 
-    // Route from the URL hash, or fall back to default view
-    window.addEventListener('hashchange', () => {
-        if (!hashChangeFromCode) {
-            navigateFromHash();
+    // Redirect old hash URLs to clean paths (backwards compatibility)
+    if (!useHashRouting && window.location.hash) {
+        const hashPath = window.location.hash.replace(/^#\/?/, '');
+        if (hashPath) {
+            history.replaceState(null, '', '/' + hashPath);
+        }
+    }
+
+    // Listen for browser back/forward
+    window.addEventListener(useHashRouting ? 'hashchange' : 'popstate', () => {
+        if (!pathChangeFromCode) {
+            navigateFromPath();
         }
     });
 
-    if (window.location.hash && window.location.hash !== '#' && window.location.hash !== '#/') {
-        navigateFromHash();
+    // Route from current URL or fall back to default view
+    const currentPath = getCurrentPath().replace(/^\/+/, '').replace(/\/+$/, '');
+    if (currentPath && currentPath !== 'index.html') {
+        navigateFromPath();
     } else {
         renderView();
     }
@@ -762,7 +784,7 @@ function updateMediaSession() {
         : 'artist/profile.jpg';
 
     // Convert relative URL to absolute for Media Session
-    const absoluteArtwork = new URL(artworkUrl, window.location.href).href;
+    const absoluteArtwork = new URL(artworkUrl, document.baseURI).href;
 
     const isSingle = !currentRelease.tracks;
 
@@ -1202,15 +1224,11 @@ function hideAllSections() {
 function renderView() {
     hideAllSections();
 
-    // Update hash to reflect the current list view
-    // For the default tracks view, use a clean URL with no hash
+    // Update URL to reflect the current list view
     if (currentView === 'tracks') {
-        hashChangeFromCode = true;
-        history.replaceState(null, '', window.location.pathname);
-        hashChangeFromCode = false;
+        updatePath('/');
     } else {
-        const viewHashMap = { collections: '#/collections', about: '#/about' };
-        updateHash(viewHashMap[currentView] || '');
+        updatePath('/' + currentView);
     }
 
     switch(currentView) {
@@ -1514,7 +1532,7 @@ function createTrackCard(track, release) {
 function showReleaseDetail(release) {
     hideAllSections();
     currentDetailRelease = release;
-    updateHash(`#/collection/${release.id}`);
+    updatePath(`/collection/${release.id}`);
 
     // Set cover
     const cover = document.getElementById('detail-cover');
@@ -1761,7 +1779,7 @@ function showTrackDetail(track, release) {
 
     // Set hash: use track slug for all tracks
     const trackSlug = track.slug || release.id;
-    updateHash(`#/track/${trackSlug}`);
+    updatePath(`/track/${trackSlug}`);
 
     // Set cover (use track cover if available, otherwise release cover)
     const cover = document.getElementById('track-detail-cover');
