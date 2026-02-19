@@ -95,6 +95,9 @@ function resolveDataUrl(path) {
     return cleanPath;
 }
 
+// Site title for dynamic document.title updates
+const siteTitle = document.title;
+
 // Routing: use History API for http/https, hash routing for file://
 const useHashRouting = window.location.protocol === 'file:';
 let pathChangeFromCode = false;
@@ -1224,11 +1227,14 @@ function hideAllSections() {
 function renderView() {
     hideAllSections();
 
-    // Update URL to reflect the current list view
+    // Update URL and document title to reflect the current list view
     if (currentView === 'tracks') {
         updatePath('/');
+        document.title = siteTitle;
     } else {
         updatePath('/' + currentView);
+        const viewName = currentView.charAt(0).toUpperCase() + currentView.slice(1);
+        document.title = `${viewName} — ${siteTitle}`;
     }
 
     switch(currentView) {
@@ -1533,6 +1539,7 @@ function showReleaseDetail(release) {
     hideAllSections();
     currentDetailRelease = release;
     updatePath(`/collection/${release.id}`);
+    document.title = `${release.title} — ${siteTitle}`;
 
     // Set cover
     const cover = document.getElementById('detail-cover');
@@ -1777,9 +1784,10 @@ function openReleaseModal(release) {
 function showTrackDetail(track, release) {
     hideAllSections();
 
-    // Set hash: use track slug for all tracks
+    // Set URL: use track slug for all tracks
     const trackSlug = track.slug || release.id;
     updatePath(`/track/${trackSlug}`);
+    document.title = `${track.title || release.title} — ${siteTitle}`;
 
     // Set cover (use track cover if available, otherwise release cover)
     const cover = document.getElementById('track-detail-cover');
